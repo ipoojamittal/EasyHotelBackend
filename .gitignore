@@ -1,0 +1,81 @@
+# Node.js dependencies
+node_modules/
+
+# Compiled TypeScript output directory
+dist/
+
+# Environment variables file(s)
+# IMPORTANT: Never commit sensitive data!
+.env
+.env.*
+!.env.example
+
+# Log files
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Diagnostic reports (https://nodejs.org/api/report.html)
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Optional stylelint cache
+.stylelintcache
+
+# Optional Prettier cache
+.prettiercache
+
+# IDE specific files
+# ------------
+
+# Optional VS Code specific files
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# Optional JetBrains Rider specific files
+*.sln.iml
+
+# WebStorm specific files
+.idea/
+
+# OS specific files
+# ------------
+
+# Optional Mac specific files
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Optional Windows specific files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Optional Linux specific files
+*~
+
+# Build & Test Output
+# ------------
+
+# Optional coverage directory
+coverage/
+.nyc_output/
+
+# Optional build directory
+build/
+
+# Optional Yarn PnP files
+.pnp.*
