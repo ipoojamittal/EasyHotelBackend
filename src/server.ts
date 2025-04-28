@@ -8,6 +8,7 @@ import rateLimit from 'express-rate-limit';
 import connectDB from './config/db'; // Import the DB connection function
 // --- Import Routers ---
 import authRouter from './routes/auth';
+import './config/passport';
 dotenv.config();
 // --- Connect to Database ---
 connectDB();

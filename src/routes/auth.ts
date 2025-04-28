@@ -15,7 +15,7 @@ if (process.env.NODE_ENV !== 'production' && jwtSecret === 'default_secret_key')
 }
 
 const validateLogin = [
-    body('username').isString().notEmpty().withMessage('Username is required'),
+    body('email').isString().notEmpty().withMessage('email is required'),
     body('password').isString().notEmpty().withMessage('Password is required'),
     (req: Request, res: Response, next: NextFunction) => {
         const errors = validationResult(req);
@@ -91,7 +91,7 @@ router.post('/register',
     async (req: Request, res: Response, next: NextFunction) => {
         const { username, password, email, phoneNumber  } = req.body;
 
-        if (!username || !password || !email || !phoneNumber) {
+        if (!password || !email || !phoneNumber) {
             res.status(400).json({ message: 'Username, password, email, and phone number are required.' });
             return
         }
@@ -119,6 +119,7 @@ router.post('/register',
 
              await newUser.save();
             res.status(201).json({
+                message: 'User successfully registered',
                 userId: newUser.id
             });
 
