@@ -64,6 +64,8 @@ router.get('/status',
         res.status(200).json({
             isAuthenticated: true,
             user: {
+                firstName: user.firstName,
+                lastName: user.lastName,
                 id: user.id,
                 email: user.email,
                 phoneNumber: user.phoneNumber, // Included based on your schema
@@ -78,6 +80,8 @@ router.get('/status',
 
 router.post('/register',
     body('email').trim().isEmail().normalizeEmail(), // Example: normalize email
+    body('firstName').trim().notEmpty(),
+    body('lastName').trim().notEmpty(),
     body('phoneNumber').trim().notEmpty(), // Add specific phone validation if needed
     body('password').isLength({ min: 8 }),
     (req: Request, res: Response, next: NextFunction) => {
@@ -89,9 +93,9 @@ router.post('/register',
         next();
     },
     async (req: Request, res: Response, next: NextFunction) => {
-        const { username, password, email, phoneNumber  } = req.body;
+        const { password, email, phoneNumber, firstName, lastName } = req.body;
 
-        if (!password || !email || !phoneNumber) {
+        if (!password || !email || !phoneNumber || !firstName || !lastName) {
             res.status(400).json({ message: 'Password, email, and phone number are required.' });
         }
 
@@ -111,6 +115,8 @@ router.post('/register',
 
 
             const newUser = new User({
+                firstName: firstName,
+                lastName: lastName,
                 email: email, // Email provided
                 phoneNumber: phoneNumber, // Phone provided
                 passwordHash: password,

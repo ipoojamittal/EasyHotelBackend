@@ -28,6 +28,8 @@ if (!encryptionSalt) {
 // --- User Interface ---
 
 export interface IUser extends Document {
+    firstName: string;
+    lastName: string;
     email?: string; // Optional email
     phoneNumber?: string; // Optional phone number
     passwordHash: string; // Store the hashed password
@@ -47,7 +49,16 @@ export interface IUser extends Document {
 // --- User Schema ---
 const UserSchema: Schema<IUser> = new Schema<IUser>(
     {
-
+        firstName: {
+            type: String,
+            required: [true, 'First name is required'],
+            trim: true,
+        },
+        lastName: {
+            type: String,
+            required: [true, 'Last name is required'],
+            trim: true,
+        },
         email: {
             type: String,
             required: true, // Make email optional
