@@ -92,8 +92,7 @@ router.post('/register',
         const { username, password, email, phoneNumber  } = req.body;
 
         if (!password || !email || !phoneNumber) {
-            res.status(400).json({ message: 'Username, password, email, and phone number are required.' });
-            return
+            res.status(400).json({ message: 'Password, email, and phone number are required.' });
         }
 
         try {
