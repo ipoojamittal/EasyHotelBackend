@@ -6,7 +6,9 @@ import cors from 'cors';
 import passport from 'passport';
 import rateLimit from 'express-rate-limit';
 import connectDB from './config/db'; // Import the DB connection function
-
+// --- Import Routers ---
+import authRouter from './routes/auth';
+import './config/passport';
 dotenv.config();
 // --- Connect to Database ---
 connectDB();
@@ -64,9 +66,11 @@ app.get('/', (req: Request, res: Response) => {
     res.send('Server is running with JWT Auth and MongoDB!');
 });
 
+app.use('/api/auth', authRouter);
+
 // --- Error Handling Middleware ---
 // This MUST be the LAST middleware added.
-app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
+app.use((err: Error, req: Request, res: Response) => {
     console.error(err.stack); // Log the error stack trace for debugging (on the server)
 
     // Check if the error has a specific status code, otherwise default to 500

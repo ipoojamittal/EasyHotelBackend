@@ -8,7 +8,9 @@ const connectDB = async () => {
             console.error('db.ts/connectDB(): DATABASE_URL is not defined in .env file');
             process.exit(1); // Exit process with failure
         }
-        await mongoose.connect(mongoURI);
+        mongoose.connection.on('connected', () => {
+            console.log('db.ts/connectDB(): MongoDB connected.');
+        });
         mongoose.connection.on('error', (err) => {
             console.error(`db.ts/connectDB(): MongoDB connection error: ${err}`);
             process.exit(1);
@@ -16,9 +18,8 @@ const connectDB = async () => {
         mongoose.connection.on('disconnected', () => {
             console.log('db.ts/connectDB(): MongoDB disconnected.');
         });
-        mongoose.connection.on('connected', () => {
-            console.log('db.ts/connectDB(): MongoDB connected.');
-        });
+        await mongoose.connect(mongoURI);
+
     }
     catch (error) {
         console.error(`db.ts/connectDB(): MongoDB connection error: ${error}`);
