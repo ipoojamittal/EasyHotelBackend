@@ -28,7 +28,6 @@ if (!encryptionSalt) {
 // --- User Interface ---
 
 export interface IUser extends Document {
-    username: string;
     email?: string; // Optional email
     phoneNumber?: string; // Optional phone number
     passwordHash: string; // Store the hashed password
@@ -48,14 +47,7 @@ export interface IUser extends Document {
 // --- User Schema ---
 const UserSchema: Schema<IUser> = new Schema<IUser>(
     {
-        username: {
-            type: String,
-            required: [true, 'Username is required'],
-            unique: true,
-            trim: true,
-            lowercase: true,
-            index: true,
-        },
+
         email: {
             type: String,
             required: true, // Make email optional
@@ -123,7 +115,7 @@ UserSchema.pre<IUser>('save', async function (next) {
         this.passwordHash = await bcrypt.hash(plainPassword, saltRounds);
         next();
     } catch (err: any) {
-        console.error(`${filename}/${hookName} : Error hashing password for user ${this.username}: ${err.message}`);
+        console.error(`${filename}/${hookName} : Error hashing password for user ${this.email}: ${err.message}`);
         next(err);
     }
 });
