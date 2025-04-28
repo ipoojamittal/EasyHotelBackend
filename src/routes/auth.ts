@@ -77,7 +77,6 @@ router.get('/status',
 );
 
 router.post('/register',
-    body('username').trim().notEmpty().isLength({ min: 3 }),
     body('email').trim().isEmail().normalizeEmail(), // Example: normalize email
     body('phoneNumber').trim().notEmpty(), // Add specific phone validation if needed
     body('password').isLength({ min: 8 }),
@@ -113,7 +112,6 @@ router.post('/register',
 
 
             const newUser = new User({
-                username: username, // Username provided
                 email: email, // Email provided
                 phoneNumber: phoneNumber, // Phone provided
                 passwordHash: password,
@@ -129,7 +127,7 @@ router.post('/register',
             console.error('auth.js/register Registration error:', error);
 
             if (error.code === 11000 || (error.name === 'MongoServerError' && error.code === 11000)) { // Check code and potentially name for robustness
-                const field = error.message.includes('username') ? 'username' : error.message.includes('email') ? 'email' : error.message.includes('phoneNumber') ? 'phone number' : 'field';
+                const field = error.message.includes('email') ? 'email' : error.message.includes('phoneNumber') ? 'phone number' : 'field';
                 res.status(409).json({ message: `An account with that ${field} already exists.` });
                 return
             }
