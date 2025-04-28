@@ -125,7 +125,7 @@ UserSchema.methods.comparePassword = async function (candidatePassword: string):
     try {
         return await bcrypt.compare(candidatePassword, this.passwordHash);
     } catch (error: any) {
-        console.error(`${filename}/${methodName} : Error comparing password for user ${this.username}: ${error.message}`);
+        console.error(`${filename}/${methodName} : Error comparing password for user ${this.email}: ${error.message}`);
         return false;
     }
 };
