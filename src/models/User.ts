@@ -25,11 +25,19 @@ if (!encryptionSalt) {
     process.exit(1);
 }
 
+// --- Define User Roles ---
+export enum Role {
+    Customer = 'customer',
+    Staff = 'staff',
+    Admin = 'admin',
+}
+
 // --- User Interface ---
 
 export interface IUser extends Document {
     firstName: string;
     lastName: string;
+    role: Role;
     email?: string; // Optional email
     phoneNumber?: string; // Optional phone number
     passwordHash: string; // Store the hashed password
@@ -80,6 +88,12 @@ const UserSchema: Schema<IUser> = new Schema<IUser>(
         passwordHash: {
             type: String,
             required: [true, 'Password is required'],
+        },
+        role: {
+            type: String,
+            enum: Object.values(Role), // Use the enum values for validation
+            required: [true, 'User role is required'],
+            index: true,
         },
         isEmailVerified: {
             type: Boolean,
