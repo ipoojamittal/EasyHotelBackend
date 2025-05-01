@@ -2,7 +2,7 @@ import express, { Router, Request, Response, NextFunction } from 'express';
 import passport from 'passport';
 import jwt, {Secret} from 'jsonwebtoken';
 import dotenv from 'dotenv';
-import User, { IUser } from '../models/User';
+import User, {IUser, Role} from '../models/User';
 import { body, validationResult } from 'express-validator';
 // import { Error } from 'mongoose';
 dotenv.config();
@@ -82,6 +82,7 @@ router.post('/register',
     body('email').trim().isEmail().normalizeEmail(), // Example: normalize email
     body('firstName').trim().notEmpty(),
     body('lastName').trim().notEmpty(),
+    body('role').trim().isIn(Object.values(Role)), // Example: restrict to specific roles
     body('phoneNumber').trim().notEmpty(), // Add specific phone validation if needed
     body('password').isLength({ min: 8 }),
     (req: Request, res: Response, next: NextFunction) => {
@@ -93,9 +94,9 @@ router.post('/register',
         next();
     },
     async (req: Request, res: Response, next: NextFunction) => {
-        const { password, email, phoneNumber, firstName, lastName } = req.body;
+        const { password, email, phoneNumber, firstName, lastName, role } = req.body;
 
-        if (!password || !email || !phoneNumber || !firstName || !lastName) {
+        if (!password || !email || !phoneNumber || !firstName || !lastName || !role) {
             res.status(400).json({ message: 'Password, email, and phone number are required.' });
         }
 
@@ -120,6 +121,7 @@ router.post('/register',
                 email: email, // Email provided
                 phoneNumber: phoneNumber, // Phone provided
                 passwordHash: password,
+                role: role,
             });
 
              await newUser.save();
