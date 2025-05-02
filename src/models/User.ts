@@ -44,7 +44,7 @@ export interface IUser extends Document {
     isEmailVerified: boolean;
     isPhoneVerified: boolean;
     isDeleted: boolean; // For soft deletes
-    hotel: mongoose.Types.ObjectId; // Reference to the Hotel model
+    hotel?: mongoose.Types.ObjectId | undefined; // Reference to the Hotel model
     identityUrls: string[]; // Array of strings (will be encrypted)
 
     // Method signature for comparing password (defined below on the schema)
