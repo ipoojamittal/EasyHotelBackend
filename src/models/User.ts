@@ -28,8 +28,8 @@ if (!encryptionSalt) {
 // --- Define User Roles ---
 export enum Role {
     Customer = 'customer',
-    Staff = 'staff',
-    Admin = 'admin',
+    HotelStaff = 'hotelStaff',
+    HotelAdmin = 'hotelAdmin',
 }
 
 // --- User Interface ---
@@ -44,6 +44,7 @@ export interface IUser extends Document {
     isEmailVerified: boolean;
     isPhoneVerified: boolean;
     isDeleted: boolean; // For soft deletes
+    hotel: mongoose.Types.ObjectId; // Reference to the Hotel model
     identityUrls: string[]; // Array of strings (will be encrypted)
 
     // Method signature for comparing password (defined below on the schema)
@@ -94,6 +95,14 @@ const UserSchema: Schema<IUser> = new Schema<IUser>(
             enum: Object.values(Role), // Use the enum values for validation
             required: [true, 'User role is required'],
             index: true,
+        },
+        hotel: {
+            type: Schema.Types.ObjectId,
+            ref: 'Hotel', // <<< This links to the 'Hotel' model
+            required: function(this: IUser): boolean {
+                return this.role === Role.HotelAdmin || this.role === Role.HotelStaff;
+            },
+            index: true
         },
         isEmailVerified: {
             type: Boolean,
