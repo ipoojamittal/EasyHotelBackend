@@ -1,5 +1,6 @@
 import mongoose, { Document, Schema } from 'mongoose';
 import { IUser } from './User';
+
 export interface IHotel extends Document {
     name: string;
     address: {
@@ -37,14 +38,16 @@ const HotelSchema: Schema<IHotel> = new Schema<IHotel>(
             required: [true, 'Hotel name is required'],
             trim: true,
         },
-
         address: {
-            street: { type: String, required: true, trim: true },
-            city: { type: String, required: true, trim: true },
-            state: { type: String, required: true, trim: true },
-            zipCode: { type: String, required: true, trim: true },
-            country: { type: String, required: true, trim: true },
-            required: true
+            type: {
+                street: { type: String, required: [true, 'Street address is required'], trim: true },
+                city: { type: String, required: [true, 'City is required'], trim: true },
+                state: { type: String, required: [true, 'State is required'], trim: true },
+                zipCode: { type: String, required: [true, 'Zip code is required'], trim: true },
+                country: { type: String, required: [true, 'Country is required'], trim: true },
+            },
+            required: [true, 'Full address information is required'],
+            _id: false
         },
         phoneNumber: [{
             type: String,
@@ -55,18 +58,16 @@ const HotelSchema: Schema<IHotel> = new Schema<IHotel>(
             trim: true,
             lowercase: true,
             match: [/.+@.+\..+/, 'Please provide a valid email address'],
+            sparse: true
         },
-
         description: {
             type: String,
             trim: true
         },
-
         amenities: [{
             type: String,
             trim: true
         }],
-
         images: [{
             type: String,
             trim: true
@@ -81,12 +82,20 @@ const HotelSchema: Schema<IHotel> = new Schema<IHotel>(
             required: true,
             default: '11:00'
         },
-
         location: {
-            type: { type: String, enum: ['Point'], required: false }, // Optional field, so not required overall
-            coordinates: { type: [Number], required: function(this: IHotel) { return !!this.location?.type; } } // Required only if location type is set
+            type: {
+                type: String,
+                enum: ['Point'],
+                required: false
+            },
+            coordinates: {
+                type: [Number],
+                required: function(this: IHotel) {
+                    return !!this.location && this.location.type === 'Point';
+                },
+                index: '2dsphere'
+            }
         },
-
         mapsUrl: {
             type: {
                 googleMaps: { type: String, trim: true },
@@ -95,7 +104,6 @@ const HotelSchema: Schema<IHotel> = new Schema<IHotel>(
             required: false,
             _id: false
         },
-
         isActive: {
             type: Boolean,
             default: true,
@@ -104,7 +112,8 @@ const HotelSchema: Schema<IHotel> = new Schema<IHotel>(
         createdBy: {
             type: Schema.Types.ObjectId,
             ref: 'User',
-            required: true
+            required: [true, 'Hotel must be associated with a creator user.'],
+            index: true
         },
     },
     {
