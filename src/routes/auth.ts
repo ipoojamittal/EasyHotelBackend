@@ -1,169 +1,140 @@
 import express, { Router, Request, Response, NextFunction } from 'express';
 import passport from 'passport';
-import jwt, {Secret} from 'jsonwebtoken';
-import dotenv from 'dotenv';
-import User, {IUser, Role} from '../models/User';
+import jwt from 'jsonwebtoken';
 import { body, validationResult } from 'express-validator';
-// import { Error } from 'mongoose';
-dotenv.config();
+import * as authService from '../services/auth';
+import { IUser, Role } from '../models/User';
+import { AppError } from '../utils/errors';
+
 const router: Router = express.Router();
-const jwtSecret: Secret = process.env.JWT_SECRET || 'default_secret_key';
-const jwtExpiresIn : number = parseInt(process.env.JWT_EXPIRES_IN || '3600', 10); // Default to 1 hour (3600 seconds) if not set;
 
-if (process.env.NODE_ENV !== 'production' && jwtSecret === 'default_secret_key') {
-    console.warn('⚠️ WARNING: Using default JWT secret. Set JWT_SECRET in production!');
-}
-
-const validateLogin = [
-    body('email').isString().notEmpty().withMessage('email is required'),
-    body('password').isString().notEmpty().withMessage('Password is required'),
+router.post('/login',
+    body('email')
+        .trim()
+        .notEmpty().withMessage('Email is required')
+        .isEmail().withMessage('Invalid email format'),
+    body('password')
+        .notEmpty().withMessage('Password is required'),
     (req: Request, res: Response, next: NextFunction) => {
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
             res.status(400).json({ errors: errors.array() });
             return
         }
-        next();
-    },
-];
 
+        passport.authenticate('local', { session: false }, (err: any, user: IUser | false, info: any) => {
+            if (err) {
+                return next(err);
 
-router.post('/login',
-    validateLogin,
-    passport.authenticate('local', { session: false }),
-    (req: Request, res: Response) => {
-        const user = req.user as IUser;
-        interface JwtPayload {
-            id: string;
-            role: Role;
-            hotelId?: string;
-        }
-        const payload: JwtPayload = {
-            id: user.id,
-            role: user.role,
-        };
-
-        if ((user.role === Role.HotelAdmin || user.role === Role.Staff) && user.hotel) {
-            payload.hotelId = user.hotel.toString();
-        }
-        const token = jwt.sign(
-            payload,
-            jwtSecret,
-            {
-                expiresIn: jwtExpiresIn,
             }
-        );
-
-        res.status(200).json({
-            message: 'Login successful',
-            token: `Bearer ${token}`,
-            user: {
-                id: user.id,
-                email: user.email,
-                firstName: user.firstName,
-                lastName: user.lastName,
-                role: user.role,
-                hotelId: payload.hotelId
+            if (!user) {
+                res.status(401).json({ message: info?.message || 'Incorrect email or password.' });
+                return
             }
-        });
+
+            try {
+                const token = authService.generateAuthToken({
+                    id: user.id,
+                    role: user.role,
+                    hotel: user.hotel
+                });
+
+                const decodedPayload = jwt.decode(token.split(' ')[1]) as authService.JwtPayload | null;
+
+                if (!decodedPayload) {
+                    throw new AppError("Failed to decode generated token.", 500);
+                }
+
+                const responseUser = authService.prepareLoginResponseUser(user, decodedPayload);
+
+                res.status(200).json({
+                    message: 'Login successful',
+                    token: token,
+                    user: responseUser
+                });
+            } catch (error) {
+                next(error);
+            }
+        })(req, res, next);
     }
 );
 
 router.get('/status',
     passport.authenticate('jwt', { session: false }),
-    (req: Request, res: Response) => {
-        const user = req.user as IUser;
-        const userData: any = {
-            id: user.id,
-            firstName: user.firstName,
-            lastName: user.lastName,
-            email: user.email,
-            phoneNumber: user.phoneNumber,
-            role: user.role,
-            isEmailVerified: user.isEmailVerified,
-            isPhoneVerified: user.isPhoneVerified,
-            createdAt: user.createdAt,
-            updatedAt: user.updatedAt
-        };
+    (req: Request, res: Response, next: NextFunction) => {
+        try {
+            if (!req.user) {
+                throw new AppError('JWT authentication succeeded but user object is missing.', 500);
+            }
+            const user = req.user as IUser;
 
-        if ((user.role === Role.HotelAdmin || user.role === Role.Staff) && user.hotel) {
-            userData.hotelId = user.hotel.toString();
+            const userData = {
+                id: user.id,
+                firstName: user.firstName,
+                lastName: user.lastName,
+                email: user.email,
+                phoneNumber: user.phoneNumber,
+                role: user.role,
+                isEmailVerified: user.isEmailVerified,
+                isPhoneVerified: user.isPhoneVerified,
+                createdAt: user.createdAt,
+                updatedAt: user.updatedAt,
+                ...( (user.role === Role.HotelAdmin || user.role === Role.Staff) && user.hotel && { hotelId: user.hotel.toString() } )
+            };
+
+            res.status(200).json({
+                isAuthenticated: true,
+                user: userData
+            });
+        } catch(error) {
+            next(error);
         }
-        res.status(200).json({
-            isAuthenticated: true,
-            user: userData
-        });
     }
 );
 
-const validateRegistration = [
-    body('email').trim().isEmail().normalizeEmail().withMessage('Valid email is required'), // Example: normalize email
-    body('firstName').trim().notEmpty().withMessage('First name is required'),
-    body('lastName').trim().notEmpty().withMessage('Last name is required'),
-    body('role').trim().isIn(Object.values(Role)),
-    body('phoneNumber').trim().notEmpty().withMessage('Phone number is required'), // Add specific phone validation if needed
-    body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters long'),
-    (req: Request, res: Response, next: NextFunction) => {
+router.post('/register',
+    body('email')
+        .trim()
+        .isEmail().withMessage('Valid email is required')
+        .normalizeEmail(),
+    body('firstName')
+        .trim()
+        .notEmpty().withMessage('First name is required')
+        .isLength({ min: 1, max: 50 }).withMessage('First name must be between 1 and 50 characters'),
+    body('lastName')
+        .trim()
+        .notEmpty().withMessage('Last name is required')
+        .isLength({ min: 1, max: 50 }).withMessage('Last name must be between 1 and 50 characters'),
+    body('phoneNumber')
+        .trim()
+        .notEmpty().withMessage('Phone number is required')
+        .isMobilePhone('any', { strictMode: false }).withMessage('Invalid phone number format'),
+    body('password')
+        .isLength({ min: 8 }).withMessage('Password must be at least 8 characters long'),
+    async (req: Request, res: Response, next: NextFunction) => {
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
             res.status(400).json({ errors: errors.array() });
             return
         }
-        next();
-    },
-]
-router.post('/register',
-    validateRegistration,
-    async (req: Request, res: Response, next: NextFunction) => {
-        const { password, email, phoneNumber, firstName, lastName } = req.body;
-        if (!password || !email || !phoneNumber || !firstName || !lastName) {
-            res.status(400).json({ message: 'First name, last name, email, phone number, and password are required.' });
-            return
-        }
 
         try {
-            const existingEmail = await User.findOne({ email: email.toLowerCase() });
-            if (existingEmail) {
-                res.status(409).json({ message: 'An account with that email address already exists.' });
-                return
-            }
+            const { password, email, phoneNumber, firstName, lastName } = req.body;
 
-            const existingPhone = await User.findOne({ phoneNumber: phoneNumber }); // Add .trim() if not handled by validator/schema effectively
-            if (existingPhone) {
-                res.status(409).json({ message: 'An account with that phone number already exists.' });
-                return
-            }
-
-
-            const newUser = new User({
-                firstName: firstName,
-                lastName: lastName,
-                email: email, // Email provided
-                phoneNumber: phoneNumber, // Phone provided
-                passwordHash: password,
-                role: Role.Customer,
+            const newUser = await authService.registerCustomer({
+                firstName,
+                lastName,
+                email,
+                phoneNumber,
+                password,
             });
 
-             await newUser.save();
             res.status(201).json({
                 message: 'User successfully registered as Customer',
                 userId: newUser.id
             });
 
-        } catch (error: any) {
-
-            console.error('auth.ts/register Registration error:', error);
-
-            if (error.code === 11000 || (error.name === 'MongoServerError' && error.code === 11000)) { // Check code and potentially name for robustness
-                const field = error.message.includes('email') ? 'email' : error.message.includes('phoneNumber') ? 'phone number' : 'field';
-                res.status(409).json({ message: `An account with that ${field} already exists.` });
-                return
-            }
-
-            if (error.name === 'ValidationError') {
-                res.status(400).json({ message: 'Validation failed.', errors: error.errors });
-                return
-            }
+        } catch (error) {
             next(error);
         }
     }
