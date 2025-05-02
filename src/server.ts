@@ -6,11 +6,18 @@ import cors from 'cors';
 import passport from 'passport';
 import rateLimit from 'express-rate-limit';
 import connectDB from './config/db'; // Import the DB connection function
+
 // --- Import Routers ---
+
 import authRouter from './routes/auth';
 import userRouter from './routes/user';
+import hotelRouter from './routes/hotel';
+import adminRouter from './routes/admin'; // Import the new admin router
+
+
 import './config/passport';
 import globalErrorHandler from "./middleware/errorHandler";
+import requestLogger from "./middleware/requestLogger";
 dotenv.config();
 // --- Connect to Database ---
 connectDB();
@@ -63,6 +70,10 @@ app.use(express.urlencoded({ extended: true }));
 // --- Passport Initialization ---
 app.use(passport.initialize());
 
+
+// --- Request Logging Middleware --- <<<< ADDED HERE
+app.use(requestLogger);
+
 // --- Routes ---
 app.get('/', (req: Request, res: Response) => {
     res.send('Server is running with JWT Auth and MongoDB!');
@@ -71,6 +82,10 @@ app.get('/', (req: Request, res: Response) => {
 app.use('/api/auth', authRouter);
 
 app.use('/api/users', userRouter)
+
+app.use('/api/hotels', hotelRouter);
+
+app.use('/api/admin', adminRouter); // Use the new admin router
 
 // --- Error Handling Middleware ---
 
