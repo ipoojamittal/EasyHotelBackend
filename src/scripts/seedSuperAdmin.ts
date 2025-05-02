@@ -68,7 +68,7 @@ const seedSuperAdmin = async () => {
             lastName,
             email: email.toLowerCase(),
             phoneNumber,
-            passwordHash: password, // Store the hashed password
+            passwordHash: hashedPassword, // Store the hashed password
             role: Role.SuperAdmin,
             isEmailVerified: true, // Assume verified for initial seeding
             isPhoneVerified: true, // Assume verified for initial seeding
