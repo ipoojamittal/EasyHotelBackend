@@ -5,10 +5,12 @@ export const checkRole = (allowedRoles: Role[]) => {
     return (req: Request, res: Response, next: NextFunction) => {
         const user = req.user as IUser; // Cast to IUser for type safety
         if (!user || !user.role) {
-            return res.status(403).json({ message: 'Forbidden: User role information is missing or user not properly authenticated.' });
+            res.status(403).json({ message: 'Forbidden: User role information is missing or user not properly authenticated.' });
+            return
         }
         if (!allowedRoles.includes(user.role)) {
-            return res.status(403).json({ message: `Forbidden: Access denied. Required roles: ${allowedRoles.join(', ')}.` });
+            res.status(403).json({ message: `Forbidden: Access denied. Required roles: ${allowedRoles.join(', ')}.` });
+            return
         }
         next();
     };
