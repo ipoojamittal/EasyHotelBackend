@@ -9,6 +9,7 @@ import connectDB from './config/db'; // Import the DB connection function
 // --- Import Routers ---
 import authRouter from './routes/auth';
 import './config/passport';
+import globalErrorHandler from "./middleware/errorHandler";
 dotenv.config();
 // --- Connect to Database ---
 connectDB();
@@ -69,20 +70,8 @@ app.get('/', (req: Request, res: Response) => {
 app.use('/api/auth', authRouter);
 
 // --- Error Handling Middleware ---
-// This MUST be the LAST middleware added.
-app.use((err: Error, req: Request, res: Response) => {
-    console.error(err.stack); // Log the error stack trace for debugging (on the server)
 
-    // Check if the error has a specific status code, otherwise default to 500
-    // You might add custom error classes that have a `statusCode` property
-    const statusCode = (err as any).statusCode || 500;
-    const message = (err as any).statusCode ? err.message : 'Internal Server Error'; // Avoid leaking sensitive error details for 500 errors
-
-    // Send a generic error message to the client, especially for 500 errors
-    res.status(statusCode).json({
-        message: message,
-    });
-});
+app.use(globalErrorHandler);
 
 // --- Start Server ---
 app.listen(PORT, () => {
