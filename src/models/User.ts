@@ -8,14 +8,11 @@ import fieldEncryption from 'mongoose-field-encryption';
 
 dotenv.config();
 
-// Get the base filename (e.g., "User.ts") to use in logs if needed
 const filename = path.basename(__filename);
 
-// --- Configuration for Encryption ---
 const encryptionKey = process.env.MONGOOSE_ENCRYPTION_KEY;
 const encryptionSalt = process.env.MONGOOSE_ENCRYPTION_SALT;
 
-// Validate that encryption keys are loaded
 if (!encryptionKey || encryptionKey.length !== 64) {
     console.error(`${filename}/config : FATAL ERROR: MONGOOSE_ENCRYPTION_KEY is not defined in .env file or is not a 64-character hex string (32 bytes).`);
     process.exit(1);
@@ -30,27 +27,25 @@ export enum Role {
     Customer = 'customer',
     Staff = 'staff',
     HotelAdmin = 'hotelAdmin',
+    SuperAdmin = 'superAdmin', // <<< Added SuperAdmin Role
 }
 
 // --- User Interface ---
-
 export interface IUser extends Document {
     firstName: string;
     lastName: string;
     role: Role;
-    email?: string; // Optional email
-    phoneNumber?: string; // Optional phone number
-    passwordHash: string; // Store the hashed password
+    email?: string;
+    phoneNumber?: string;
+    passwordHash: string;
     isEmailVerified: boolean;
     isPhoneVerified: boolean;
-    isDeleted: boolean; // For soft deletes
-    hotel?: mongoose.Types.ObjectId | undefined; // Reference to the Hotel model
-    identityUrls: string[]; // Array of strings (will be encrypted)
+    isDeleted: boolean;
+    hotel?: mongoose.Types.ObjectId | undefined; // Should NOT be present for SuperAdmin
+    identityUrls: string[];
 
-    // Method signature for comparing password (defined below on the schema)
     comparePassword(candidatePassword: string): Promise<boolean>;
 
-    // Timestamps added by Mongoose option below
     createdAt: Date;
     updatedAt: Date;
 }
@@ -70,13 +65,13 @@ const UserSchema: Schema<IUser> = new Schema<IUser>(
         },
         email: {
             type: String,
-            required: true, // Make email optional
+            required: true,
             unique: true,
-            sparse: true, // Necessary for unique constraint on optional fields
+            sparse: true,
             trim: true,
             lowercase: true,
-            match: [/.+@.+\..+/, 'Please provide a valid email address'], // Basic email format validation
-            index: true, // Index for faster lookup if needed
+            match: [/.+@.+\..+/, 'Please provide a valid email address'],
+            index: true,
         },
         phoneNumber: {
             type: String,
@@ -98,9 +93,19 @@ const UserSchema: Schema<IUser> = new Schema<IUser>(
         },
         hotel: {
             type: Schema.Types.ObjectId,
-            ref: 'Hotel', // <<< This links to the 'Hotel' model
-            required: function(this: IUser): boolean {
-                return this.role === Role.HotelAdmin || this.role === Role.Staff;
+            ref: 'Hotel',
+            // Hotel is required ONLY for Staff and HotelAdmin
+            validate: {
+                validator: function(this: IUser, value: any): boolean {
+                    // Allow undefined/null if role is Customer or SuperAdmin
+                    if (this.role === Role.Customer || this.role === Role.SuperAdmin) {
+                        return value === undefined || value === null;
+                    }
+                    // Otherwise (Staff/HotelAdmin), it must be required (handled by 'required' above)
+                    // This validator mainly prevents setting it for Customer/SuperAdmin
+                    return true;
+                },
+                message: 'Hotel association is not applicable for Customer or SuperAdmin roles.'
             },
             index: true
         },
@@ -112,34 +117,36 @@ const UserSchema: Schema<IUser> = new Schema<IUser>(
             type: Boolean,
             default: false,
         },
-        isDeleted: { // Field for soft delete functionality
+        isDeleted: {
             type: Boolean,
             default: false,
-            index: true, // Index this field if you frequently query for non-deleted users (e.g., { isDeleted: false })
+            index: true,
         },
-        identityUrls: { // Field to be encrypted
-            type: [String], // Array of strings
-            required: false, // Make it optional or required as needed
+        identityUrls: {
+            type: [String],
+            required: false,
             default: [],
         },
     },
     {
-        timestamps: true, // Automatically manage `createdAt` and `updatedAt` fields
+        timestamps: true,
     }
 );
 
 
 // --- Apply Encryption Plugin ---
 UserSchema.plugin(fieldEncryption.fieldEncryption, {
-    fields: ['identityUrls'], // Specify fields to encrypt
-    secret: encryptionKey, // Encryption key from environment variable
-    salt: encryptionSalt, // Static salt from environment variable (used in key derivation)
-    // ... other options if needed
+    fields: ['identityUrls'],
+    secret: encryptionKey,
+    salt: encryptionSalt,
 });
 
-
+// --- Middleware and Methods ---
 UserSchema.pre<IUser>('save', async function (next) {
     const hookName = 'preSaveUser';
+    if (this.role === Role.SuperAdmin) {
+        this.hotel = undefined;
+    }
     if (!this.isModified('passwordHash')) {
         return next();
     }
@@ -164,6 +171,7 @@ UserSchema.methods.comparePassword = async function (candidatePassword: string):
     }
 };
 
+// --- Model Export ---
 const User = mongoose.model<IUser>('User', UserSchema);
 
 export default User;
