@@ -28,7 +28,7 @@ if (!encryptionSalt) {
 // --- Define User Roles ---
 export enum Role {
     Customer = 'customer',
-    HotelStaff = 'hotelStaff',
+    Staff = 'staff',
     HotelAdmin = 'hotelAdmin',
 }
 
@@ -100,7 +100,7 @@ const UserSchema: Schema<IUser> = new Schema<IUser>(
             type: Schema.Types.ObjectId,
             ref: 'Hotel', // <<< This links to the 'Hotel' model
             required: function(this: IUser): boolean {
-                return this.role === Role.HotelAdmin || this.role === Role.HotelStaff;
+                return this.role === Role.HotelAdmin || this.role === Role.Staff;
             },
             index: true
         },

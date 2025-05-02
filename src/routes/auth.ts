@@ -33,9 +33,19 @@ router.post('/login',
     passport.authenticate('local', { session: false }),
     (req: Request, res: Response) => {
         const user = req.user as IUser;
-        const payload : object = {
-            id: user.id, // Use the user's unique MongoDB document ID (_id).
+        interface JwtPayload {
+            id: string;
+            role: Role;
+            hotelId?: string;
+        }
+        const payload: JwtPayload = {
+            id: user.id,
+            role: user.role,
         };
+
+        if ((user.role === Role.HotelAdmin || user.role === Role.Staff) && user.hotel) {
+            payload.hotelId = user.hotel.toString();
+        }
         const token = jwt.sign(
             payload,
             jwtSecret,
@@ -44,14 +54,16 @@ router.post('/login',
             }
         );
 
-        console.log(`auth.js/login : Login successful, token generated for user: ${user.email}`);
-
         res.status(200).json({
             message: 'Login successful',
             token: `Bearer ${token}`,
             user: {
                 id: user.id,
                 email: user.email,
+                firstName: user.firstName,
+                lastName: user.lastName,
+                role: user.role,
+                hotelId: payload.hotelId
             }
         });
     }
@@ -61,30 +73,36 @@ router.get('/status',
     passport.authenticate('jwt', { session: false }),
     (req: Request, res: Response) => {
         const user = req.user as IUser;
+        const userData: any = {
+            id: user.id,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            email: user.email,
+            phoneNumber: user.phoneNumber,
+            role: user.role,
+            isEmailVerified: user.isEmailVerified,
+            isPhoneVerified: user.isPhoneVerified,
+            createdAt: user.createdAt,
+            updatedAt: user.updatedAt
+        };
+
+        if ((user.role === Role.HotelAdmin || user.role === Role.Staff) && user.hotel) {
+            userData.hotelId = user.hotel.toString();
+        }
         res.status(200).json({
             isAuthenticated: true,
-            user: {
-                firstName: user.firstName,
-                lastName: user.lastName,
-                id: user.id,
-                email: user.email,
-                phoneNumber: user.phoneNumber, // Included based on your schema
-                isEmailVerified: user.isEmailVerified,
-                isPhoneVerified: user.isPhoneVerified,
-                // identityUrls: user.identityUrls // Decrypted value is sent
-                // Add other fields as needed
-            }
+            user: userData
         });
     }
 );
 
-router.post('/register',
-    body('email').trim().isEmail().normalizeEmail(), // Example: normalize email
-    body('firstName').trim().notEmpty(),
-    body('lastName').trim().notEmpty(),
-    body('role').trim().isIn(Object.values(Role)), // Example: restrict to specific roles
-    body('phoneNumber').trim().notEmpty(), // Add specific phone validation if needed
-    body('password').isLength({ min: 8 }),
+const validateRegistration = [
+    body('email').trim().isEmail().normalizeEmail().withMessage('Valid email is required'), // Example: normalize email
+    body('firstName').trim().notEmpty().withMessage('First name is required'),
+    body('lastName').trim().notEmpty().withMessage('Last name is required'),
+    body('role').trim().isIn(Object.values(Role)),
+    body('phoneNumber').trim().notEmpty().withMessage('Phone number is required'), // Add specific phone validation if needed
+    body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters long'),
     (req: Request, res: Response, next: NextFunction) => {
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
@@ -93,15 +111,17 @@ router.post('/register',
         }
         next();
     },
+]
+router.post('/register',
+    validateRegistration,
     async (req: Request, res: Response, next: NextFunction) => {
-        const { password, email, phoneNumber, firstName, lastName, role } = req.body;
-
-        if (!password || !email || !phoneNumber || !firstName || !lastName || !role) {
-            res.status(400).json({ message: 'Password, email, and phone number are required.' });
+        const { password, email, phoneNumber, firstName, lastName } = req.body;
+        if (!password || !email || !phoneNumber || !firstName || !lastName) {
+            res.status(400).json({ message: 'First name, last name, email, phone number, and password are required.' });
+            return
         }
 
         try {
-
             const existingEmail = await User.findOne({ email: email.toLowerCase() });
             if (existingEmail) {
                 res.status(409).json({ message: 'An account with that email address already exists.' });
@@ -121,18 +141,18 @@ router.post('/register',
                 email: email, // Email provided
                 phoneNumber: phoneNumber, // Phone provided
                 passwordHash: password,
-                role: role,
+                role: Role.Customer,
             });
 
              await newUser.save();
             res.status(201).json({
-                message: 'User successfully registered',
+                message: 'User successfully registered as Customer',
                 userId: newUser.id
             });
 
         } catch (error: any) {
 
-            console.error('auth.js/register Registration error:', error);
+            console.error('auth.ts/register Registration error:', error);
 
             if (error.code === 11000 || (error.name === 'MongoServerError' && error.code === 11000)) { // Check code and potentially name for robustness
                 const field = error.message.includes('email') ? 'email' : error.message.includes('phoneNumber') ? 'phone number' : 'field';
