@@ -8,6 +8,7 @@ import rateLimit from 'express-rate-limit';
 import connectDB from './config/db'; // Import the DB connection function
 // --- Import Routers ---
 import authRouter from './routes/auth';
+import userRouter from './routes/user';
 import './config/passport';
 import globalErrorHandler from "./middleware/errorHandler";
 dotenv.config();
@@ -68,6 +69,8 @@ app.get('/', (req: Request, res: Response) => {
 });
 
 app.use('/api/auth', authRouter);
+
+app.use('/api/users', userRouter)
 
 // --- Error Handling Middleware ---
 
