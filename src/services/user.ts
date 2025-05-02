@@ -49,6 +49,16 @@ export interface ListUserOptions {
     sortOrder?: 'asc' | 'desc';
 }
 
+export interface AdminOrStaffCreationData {
+    firstName: string;
+    lastName: string;
+    email: string;
+    phoneNumber: string;
+    password: string;
+    role: Role.HotelAdmin | Role.Staff; // Specify allowed roles
+    hotelId?: string; // Optional: Required only if role is Staff
+}
+
 /**
  * Takes a Mongoose IUser document and returns a plain object with sensitive fields removed.
  * @param user - The Mongoose IUser document.
@@ -280,5 +290,73 @@ export const listUsers = async (options: ListUserOptions) => {
     } catch (error: any) {
         console.error('Error listing users in service:', error);
         throw new AppError('Failed to list users.', 500);
+    }
+};
+
+export const createAdminOrStaffUser = async (data: AdminOrStaffCreationData): Promise<IUser> => {
+    const { firstName, lastName, email, phoneNumber, password, role, hotelId } = data;
+    const normalizedEmail = email.toLowerCase();
+
+    if (role !== Role.HotelAdmin && role !== Role.Staff) {
+        throw new BadRequestError(`Invalid role specified. Only '${Role.HotelAdmin}' or '${Role.Staff}' can be created here.`);
+    }
+
+    if (role === Role.Staff) {
+        if (!hotelId) {
+            throw new BadRequestError(`Hotel ID is required when creating a user with role '${Role.Staff}'.`);
+        }
+        if (!mongoose.Types.ObjectId.isValid(hotelId)) {
+            throw new BadRequestError('Invalid Hotel ID format provided for Staff user.');
+        }
+
+    } else if (role === Role.HotelAdmin) {
+        if (hotelId) {
+            throw new BadRequestError(`Hotel ID must not be provided when creating a user with role '${Role.HotelAdmin}'. Admins create their own hotels.`);
+        }
+    }
+
+    const existingUser = await User.findOne({
+        $or: [{ email: normalizedEmail }, { phoneNumber: phoneNumber }],
+        isDeleted: false
+    }).lean();
+
+    if (existingUser) {
+        if (existingUser.email === normalizedEmail) {
+            throw new ConflictError('An active user with this email address already exists.');
+        } else {
+            throw new ConflictError('An active user with this phone number already exists.');
+        }
+    }
+
+    const newUser = new User({
+        firstName,
+        lastName,
+        email: normalizedEmail,
+        phoneNumber,
+        passwordHash: password,
+        role: role,
+        isEmailVerified: false,
+        isPhoneVerified: false,
+        isDeleted: false,
+
+
+        hotel: (role === Role.Staff && hotelId) ? new mongoose.Types.ObjectId(hotelId) : undefined
+    });
+
+    try {
+        const savedUser = await newUser.save();
+        return savedUser;
+    } catch (error: any) {
+        console.error(`user.service/createAdminOrStaffUser(): Error creating new user with role '${role}':`, error);
+        // Handle potential duplicate key errors during save
+        if (error.code === 11000) {
+            const field = Object.keys(error.keyValue)[0];
+            throw new ConflictError(`An account with that ${field} already exists.`);
+        }
+        if (error instanceof mongoose.Error.ValidationError) {
+            throw new BadRequestError(`Invalid user data: ${error.message}`);
+        }
+        // Throw a generic error for other database issues
+        throw new AppError(`Failed to create ${role} user due to a database error.`, 500);
     }
 };
