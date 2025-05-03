@@ -12,7 +12,9 @@ import connectDB from './config/db'; // Import the DB connection function
 import authRouter from './routes/auth';
 import userRouter from './routes/user';
 import hotelRouter from './routes/hotel';
-import adminRouter from './routes/admin'; // Import the new admin router
+import adminRouter from './routes/admin';
+import roomTypeRouter from './routes/roomType';
+import roomRouter from './routes/room';
 
 
 import './config/passport';
@@ -85,7 +87,11 @@ app.use('/api/users', userRouter)
 
 app.use('/api/hotels', hotelRouter);
 
-app.use('/api/admin', adminRouter); // Use the new admin router
+app.use('/api/admin', adminRouter);
+
+app.use('/api/hotels/:hotelId/room-types', roomTypeRouter); // <<< Mount RoomType router
+
+app.use('/api/hotels/:hotelId/rooms', roomRouter);
 
 // --- Error Handling Middleware ---
 
