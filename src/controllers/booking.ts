@@ -142,7 +142,8 @@ export const handleUpdateBookingDetails = async (req: Request, res: Response, ne
     try {
         const user = req.user as IUser;
         if (!user) {
-            return next(new AppError('Authentication error: User data missing.', 500));
+            next(new AppError('Authentication error: User data missing.', 500));
+            return;
         }
         const userPayload: IUserPayload = { id: user.id, role: user.role, hotel: user.hotel ? user.hotel.toString() : undefined };
         const updatedBooking = await bookingService.updateBookingDetails(req.params.bookingId, req.body, userPayload);
@@ -156,7 +157,8 @@ export const handleCancelBooking = async (req: Request, res: Response, next: Nex
     try {
         const user = req.user as IUser;
         if (!user) {
-            return next(new AppError('Authentication error: User data missing.', 500));
+            next(new AppError('Authentication error: User data missing.', 500));
+            return;
         }
         const userPayload: IUserPayload = { id: user.id, role: user.role, hotel: user.hotel ? user.hotel.toString() : undefined };
         const cancelledBooking = await bookingService.cancelBooking(req.params.bookingId, userPayload);
@@ -165,3 +167,29 @@ export const handleCancelBooking = async (req: Request, res: Response, next: Nex
         next(error);
     }
 };
+
+export const cancelBooking = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ) => {
+    try {
+      const { bookingId } = req.params;
+      const user = req.user as IUserPayload; // Assuming user is attached by auth middleware
+  
+      if (!user) {
+        throw new AppError('Authentication required', 401);
+      }
+  
+      const cancelledBooking = await bookingService.cancelBooking(bookingId, user);
+  
+      res.status(200).json({
+        status: 'success',
+        data: {
+          booking: cancelledBooking,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
