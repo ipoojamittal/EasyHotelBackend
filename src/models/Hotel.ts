@@ -29,6 +29,7 @@ export interface IHotel extends Document {
     createdBy: mongoose.Types.ObjectId | IUser;
     createdAt: Date;
     updatedAt: Date;
+    _id: mongoose.Types.ObjectId;
 }
 
 const HotelSchema: Schema<IHotel> = new Schema<IHotel>(

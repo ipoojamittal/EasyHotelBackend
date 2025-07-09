@@ -15,6 +15,7 @@ import hotelRouter from './routes/hotel';
 import adminRouter from './routes/admin';
 import roomTypeRouter from './routes/roomType';
 import roomRouter from './routes/room';
+import bookingRouter from './routes/booking';
 
 
 import './config/passport';
@@ -92,6 +93,8 @@ app.use('/api/admin', adminRouter);
 app.use('/api/hotels/:hotelId/room-types', roomTypeRouter); // <<< Mount RoomType router
 
 app.use('/api/hotels/:hotelId/rooms', roomRouter);
+
+app.use('/api/booking', bookingRouter); // Public route for listing rooms (if needed)
 
 // --- Error Handling Middleware ---
 
