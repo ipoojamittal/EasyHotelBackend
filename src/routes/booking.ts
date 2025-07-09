@@ -49,6 +49,15 @@ router.patch(
     bookingController.handleUpdateBookingStatus
 );
 
+// Anyone logged in (customer, staff, admin) can attempt to cancel.
+// The service layer will handle the specific permissions.
+router.patch(
+    '/:bookingId/cancel',
+    checkRole([Role.HotelAdmin, Role.Staff]),
+    param('bookingId').isMongoId(),
+    bookingController.cancelBooking
+  );
+
 // --- NEW UPDATE AND CANCEL ROUTES ---
 router.patch(
     '/:bookingId',
