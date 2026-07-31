@@ -10,8 +10,6 @@ import { RoomStatus } from '../models/Room';
 
 const router: Router = express.Router({ mergeParams: true });
 
-router.use(passport.authenticate('jwt', { session: false }));
-
 const validateHotelIdParam = param('hotelId').isMongoId().withMessage('Invalid Hotel ID format in URL.');
 const validateRoomIdParam = param('roomId').isMongoId().withMessage('Invalid Room ID format in URL.');
 
@@ -58,6 +56,32 @@ const listRoomsValidation = [
     query('sortOrder').optional().isIn(['asc', 'desc']),
 ];
 
+// --- Public routes (no auth — hotel detail page shows rooms to anonymous users) ---
+
+/**
+ * GET /api/hotels/:hotelId/rooms - List room instances for a hotel
+ * Public: accessible without authentication so the hotel detail page
+ * can show rooms to anonymous visitors.
+ */
+router.get('/',
+    validateHotelIdParam,
+    listRoomsValidation,
+    roomController.handleListRooms
+);
+
+/**
+ * GET /api/hotels/:hotelId/rooms/:roomId - Get details of a specific room instance
+ * Public: accessible without authentication.
+ */
+router.get('/:roomId',
+    validateHotelIdParam,
+    validateRoomIdParam,
+    roomController.handleGetRoomDetails
+);
+
+// --- Authenticated routes (JWT required) ---
+
+router.use(passport.authenticate('jwt', { session: false }));
 
 /**
  * POST /api/hotels/:hotelId/rooms - Create a new room instance
@@ -73,42 +97,6 @@ router.post('/',
     validateHotelIdParam,
     createRoomValidation,
     roomController.handleCreateRoom
-);
-
-/**
- * GET /api/hotels/:hotelId/rooms - List room instances for a hotel
- * @route GET /api/hotels/{hotelId}/rooms
- * @group Rooms - Room instance management
- * @param {string} hotelId.path.required - ID of the hotel
- * @param {integer} page.query - Page number
- * @param {integer} limit.query - Items per page
- * @param {string} roomTypeId.query - Filter by RoomType ID
- * @param {string} status.query - Filter by RoomStatus
- * @param {boolean} isActive.query - Filter by active status (defaults true)
- * @param {string} sortBy.query - Field to sort by
- * @param {string} sortOrder.query - Sort order ('asc' or 'desc')
- * @returns {object} 200 - List of rooms (populated) and pagination info
- * @security JWT - Authenticated users can list (service might apply further logic)
- */
-router.get('/',
-    validateHotelIdParam,
-    listRoomsValidation,
-    roomController.handleListRooms
-);
-
-/**
- * GET /api/hotels/:hotelId/rooms/:roomId - Get details of a specific room instance
- * @route GET /api/hotels/{hotelId}/rooms/{roomId}
- * @group Rooms - Room instance management
- * @param {string} hotelId.path.required - ID of the hotel
- * @param {string} roomId.path.required - ID of the room instance
- * @returns {IRoom.model} 200 - The room object (populated with RoomType)
- * @security JWT - Authenticated users can view details
- */
-router.get('/:roomId',
-    validateHotelIdParam,
-    validateRoomIdParam,
-    roomController.handleGetRoomDetails
 );
 
 /**

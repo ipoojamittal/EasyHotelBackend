@@ -8,6 +8,35 @@ import { Role } from '../models/User'; // Import Role enum
 
 const router: Router = express.Router();
 
+// --- Public Routes (no auth required — landing page, browse) ---
+
+/**
+ * GET /api/hotels - List hotels with filtering and pagination
+ * Public: accessible without authentication so the landing page and
+ * browse page can show hotels to anonymous visitors.
+ */
+router.get('/',
+    query('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer'),
+    query('limit').optional().isInt({ min: 1 }).withMessage('Limit must be a positive integer'),
+    query('city').optional().isString().trim(),
+    query('country').optional().isString().trim(),
+    query('isActive').optional().isBoolean().withMessage('isActive must be true or false'),
+    query('sortBy').optional().isString().trim().notEmpty(),
+    query('sortOrder').optional().isIn(['asc', 'desc']).withMessage('sortOrder must be "asc" or "desc"'),
+    hotelController.handleListHotels
+);
+
+/**
+ * GET /api/hotels/{hotelId} - Get public details of a specific hotel
+ * Public: accessible without authentication.
+ */
+router.get('/:hotelId',
+    param('hotelId').isMongoId().withMessage('Invalid Hotel ID format'),
+    hotelController.handleGetHotelDetails
+);
+
+// --- Authenticated routes (JWT required) ---
+
 router.use(passport.authenticate('jwt', { session: false }));
 
 // --- Routes for Hotel Admins Managing Their OWN Hotel ---
@@ -101,52 +130,6 @@ router.patch('/my-hotel',
 router.delete('/my-hotel',
     checkRole([Role.HotelAdmin]),
     hotelController.handleDeleteMyHotel
-);
-
-
-// --- Public Routes (Accessible by any authenticated user) ---
-
-/**
- * GET /api/hotels - List hotels with filtering and pagination
- * @route GET /api/hotels
- * @group Hotels - Operations about hotels
- * @param {integer} page.query - Page number
- * @param {integer} limit.query - Items per page
- * @param {string} city.query - Filter by city (case-insensitive)
- * @param {string} country.query - Filter by country (case-insensitive)
- * @param {boolean} isActive.query - Filter by active status (defaults to true)
- * @param {string} sortBy.query - Field to sort by (e.g., 'name', 'createdAt')
- * @param {string} sortOrder.query - Sort order ('asc' or 'desc')
- * @returns {object} 200 - An object containing the list of hotels and pagination info
- * @returns {Error} 400 - Invalid query parameters
- * @returns {Error} 401 - Unauthorized
- * @security JWT
- */
-router.get('/',
-    query('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer'),
-    query('limit').optional().isInt({ min: 1 }).withMessage('Limit must be a positive integer'),
-    query('city').optional().isString().trim(),
-    query('country').optional().isString().trim(),
-    query('isActive').optional().isBoolean().withMessage('isActive must be true or false'),
-    query('sortBy').optional().isString().trim().notEmpty(),
-    query('sortOrder').optional().isIn(['asc', 'desc']).withMessage('sortOrder must be "asc" or "desc"'),
-    hotelController.handleListHotels
-);
-
-/**
- * GET /api/hotels/{hotelId} - Get public details of a specific hotel
- * @route GET /api/hotels/{hotelId}
- * @group Hotels - Operations about hotels
- * @param {string} hotelId.path.required - The ID of the hotel to retrieve
- * @returns {IHotel.model} 200 - The hotel object
- * @returns {Error} 400 - Invalid Hotel ID format
- * @returns {Error} 401 - Unauthorized
- * @returns {Error} 404 - Hotel not found or not active
- * @security JWT
- */
-router.get('/:hotelId',
-    param('hotelId').isMongoId().withMessage('Invalid Hotel ID format'),
-    hotelController.handleGetHotelDetails
 );
 
 
