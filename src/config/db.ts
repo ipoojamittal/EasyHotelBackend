@@ -1,6 +1,21 @@
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 dotenv.config(); // Load .env variables
+
+// Global schema defaults: expose `id` (string) instead of `_id` in JSON
+// output, and drop `__v`. This aligns Mongoose documents with the
+// frontend's TypeScript types which expect `id: string`.
+mongoose.set('toJSON', {
+    virtuals: true,
+    versionKey: false,
+    transform: (_doc, ret) => {
+        // `virtuals: true` already adds `id`; remove the raw `_id` and `__v`.
+        delete ret._id;
+        delete ret.__v;
+        return ret;
+    },
+});
+
 const connectDB = async () => {
     try {
         const mongoURI = process.env.DATABASE_URL;
