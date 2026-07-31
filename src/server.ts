@@ -1,4 +1,5 @@
 // src/server.ts
+import './polyfills/slow-buffer'; // Must load first — polyfills SlowBuffer for Node 22+ (jsonwebtoken compat)
 import express, { Express, Request, Response, NextFunction } from 'express';
 import dotenv from 'dotenv';
 import helmet from 'helmet';
