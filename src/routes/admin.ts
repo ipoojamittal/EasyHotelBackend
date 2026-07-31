@@ -26,9 +26,8 @@ router.use(passport.authenticate('jwt', { session: false }));
  * @security JWT
  */
 router.post('/',
-    // Authorization: Only allow existing HotelAdmins to use this endpoint (for now)
-    // TODO: Change to Role.SuperAdmin if that role is implemented later for better security
-    // checkRole([Role.HotelAdmin]),
+    // Authorization: Only allow HotelAdmins (SuperAdmin scope to be added).
+    checkRole([Role.HotelAdmin]),
     // Input Validation
     body('firstName').trim().notEmpty().withMessage('First name is required').isLength({ max: 50 }),
     body('lastName').trim().notEmpty().withMessage('Last name is required').isLength({ max: 50 }),
