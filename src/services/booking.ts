@@ -115,6 +115,7 @@ export const createBooking = async (data: BookingCreationData, requestingUser: I
     if (!hotel) throw new NotFoundError(`Hotel with ID ${hotelId} not found or is inactive.`);
     const room = await Room.findOne({_id: roomId, isDeleted: false}).populate<{ roomType: IRoomType }>('roomType');
     if (!room) throw new NotFoundError(`Room with ID ${roomId} not found or is inactive.`);
+    if (room.status === RoomStatus.OutOfService) throw new BadRequestError('This room is out of service and cannot be booked.');
     if (room.roomType instanceof mongoose.Types.ObjectId || !room.roomType) throw new AppError('Server Error: Room Type information could not be loaded.', 500);
     const roomType = room.roomType as IRoomType;
     const maxCapacity = room.capacity || roomType.maxCapacity || roomType.defaultCapacity;
@@ -191,6 +192,7 @@ export const createBookingOnBehalf = async (data: StaffBookingCreationData, staf
     if (!hotel) throw new NotFoundError(`Hotel with ID ${hotelId} not found or is inactive.`);
     const room = await Room.findOne({_id: roomId, isDeleted: false}).populate<{ roomType: IRoomType }>('roomType');
     if (!room) throw new NotFoundError(`Room with ID ${roomId} not found or is inactive.`);
+    if (room.status === RoomStatus.OutOfService) throw new BadRequestError('This room is out of service and cannot be booked.');
     if (room.roomType instanceof mongoose.Types.ObjectId || !room.roomType) throw new AppError('Server Error: Room Type information could not be loaded.', 500);
     const roomType = room.roomType as IRoomType;
     const maxCapacity = room.capacity || roomType.maxCapacity || roomType.defaultCapacity;

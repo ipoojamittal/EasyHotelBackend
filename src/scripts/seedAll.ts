@@ -35,12 +35,15 @@ const PASSWORD = 'Password123!'; // same for all seeded users
 // Date helpers
 // ---------------------------------------------------------------------------
 
+// Use UTC midnight as the base so dates are timezone-independent.
+// This matches the frontend which sends date-only 'yyyy-MM-dd' strings
+// (parsed as UTC midnight by express-validator's isISO8601().toDate()).
 const TODAY = new Date();
-TODAY.setHours(0, 0, 0, 0);
+TODAY.setUTCHours(0, 0, 0, 0);
 
 function addDays(date: Date, days: number): Date {
   const d = new Date(date);
-  d.setDate(d.getDate() + days);
+  d.setUTCDate(d.getUTCDate() + days);
   return d;
 }
 
