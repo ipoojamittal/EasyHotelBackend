@@ -1,5 +1,7 @@
 # EasyHotel Backend
 
+> This is the **backend** repository for EasyHotel. The companion frontend lives at **[ipoojamittal/EasyHotelFrontend](https://github.com/ipoojamittal/EasyHotelFrontend)**.
+
 A multi-tenant Hotel Management System (HMS) REST API built with Node.js, Express 5, TypeScript, and MongoDB/Mongoose. It provides JWT-based authentication, role-scoped hotel/room/room-type management, a transactional booking engine, and superAdmin oversight — with hotels operating as independently managed tenants under their own admins.
 
 ## Table of Contents
