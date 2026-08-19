@@ -14,9 +14,9 @@ const getListOptions = (req: Request): hotelService.ListHotelOptions => {
     const limit = parseInt(req.query.limit as string) || 10;
     const city = req.query.city as string | undefined;
     const country = req.query.country as string | undefined;
-    let isActive: boolean | undefined;
-    if (req.query.isActive === 'true') isActive = true;
-    if (req.query.isActive === 'false') isActive = false;
+    let isDeleted: boolean | undefined;
+    if (req.query.isDeleted === 'true') isDeleted = true;
+    if (req.query.isDeleted === 'false') isDeleted = false;
     const sortBy = req.query.sortBy as string | undefined;
     const sortOrder = req.query.sortOrder as 'asc' | 'desc' | undefined;
 
@@ -28,7 +28,7 @@ const getListOptions = (req: Request): hotelService.ListHotelOptions => {
         limit: Math.max(1, limit), // Ensure limit is at least 1
         city,
         country,
-        isActive,
+        isDeleted,
         sortBy,
         sortOrder: validSortOrder,
     };

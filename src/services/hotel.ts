@@ -42,10 +42,13 @@ export interface ListHotelOptions {
     limit?: number;
     city?: string;
     country?: string;
-    isActive?: boolean; // Filter by active status
+    isDeleted?: boolean; // Filter by deleted status (default: false = active only)
     sortBy?: keyof IHotel | string; // Allow sorting by model fields or custom strings
     sortOrder?: 'asc' | 'desc';
 }
+
+// Whitelisted sort fields to prevent NoSQL injection via sort parameters.
+const ALLOWED_HOTEL_SORT_FIELDS = ['name', 'createdAt', 'updatedAt', 'address.city', 'address.country'];
 
 const validateObjectId = (id: string | mongoose.Types.ObjectId, paramName: string): void => {
     if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -56,7 +59,7 @@ const validateObjectId = (id: string | mongoose.Types.ObjectId, paramName: strin
 const findActiveHotelByIdInternal = async (hotelId: string | mongoose.Types.ObjectId): Promise<IHotel> => {
     validateObjectId(hotelId, 'hotelId');
     try {
-        const hotel = await Hotel.findOne({ _id: hotelId, isActive: true });
+        const hotel = await Hotel.findOne({ _id: hotelId, isDeleted: false });
         if (!hotel) {
             // What: Throw a specific error when the resource is not found.
             // Why: Allows calling functions and the error handler middleware to react specifically to "not found" scenarios (e.g., return a 404 status).
@@ -85,7 +88,7 @@ export const createHotel = async (data: HotelCreationData, adminUserId: string |
     const newHotel = new Hotel({
         ...data,
         createdBy: adminUserId,
-        isActive: true, // Ensure new hotels are active by default
+        isDeleted: false, // Ensure new hotels are active by default
     });
 
     try {
@@ -179,12 +182,12 @@ export const updateHotel = async (
  * @returns An object containing the list of hotels and pagination details.
  */
 export const listHotels = async (options: ListHotelOptions) => {
-    const page = Math.max(1, options.page || 1);
-    const limit = Math.max(1, options.limit || 10);
+    const page = Math.min(1000, Math.max(1, options.page || 1));
+    const limit = Math.min(100, Math.max(1, options.limit || 10));
     const skip = (page - 1) * limit;
 
     const filterQuery: any = {};
-    filterQuery.isActive = options.isActive ?? true; // Default to true if isActive is undefined/null
+    filterQuery.isDeleted = options.isDeleted ?? false; // Default to active (non-deleted) only
 
     if (options.city) {
         filterQuery['address.city'] = new RegExp(options.city, 'i'); // Case-insensitive match
@@ -192,11 +195,10 @@ export const listHotels = async (options: ListHotelOptions) => {
     if (options.country) {
         filterQuery['address.country'] = new RegExp(options.country, 'i');
     }
-    // Add more filters as needed (e.g., amenities, price range)
 
-    // --- Build Sort Options ---
+    // --- Build Sort Options (whitelisted) ---
     const sortOptions: any = {};
-    if (options.sortBy) {
+    if (options.sortBy && ALLOWED_HOTEL_SORT_FIELDS.includes(options.sortBy as string)) {
         sortOptions[options.sortBy] = options.sortOrder === 'asc' ? 1 : -1;
     } else {
         sortOptions.createdAt = -1; // Default sort: newest first
@@ -241,7 +243,7 @@ export const findHotelByAdmin = async (adminUserId: string | mongoose.Types.Obje
     validateObjectId(adminUserId, 'adminUserId');
 
     try {
-       const hotel = await Hotel.findOne({ createdBy: adminUserId, isActive: true });
+       const hotel = await Hotel.findOne({ createdBy: adminUserId, isDeleted: false });
 
         if (!hotel) {
             throw new NotFoundError('No active hotel found associated with this admin user.');
@@ -256,7 +258,7 @@ export const findHotelByAdmin = async (adminUserId: string | mongoose.Types.Obje
 };
 
 /**
- * Soft-deletes a hotel by setting its isActive flag to false.
+ * Soft-deletes a hotel by setting its isDeleted flag to true.
  * Only the admin who created the hotel can delete it.
  * @param hotelId - The ID of the hotel to deactivate.
  * @param requestingUserId - The ID of the user attempting the deactivation.
@@ -277,16 +279,35 @@ export const softDeleteHotel = async (
         console.warn(`hotel.service/softDeleteHotel(): Forbidden attempt - User ${requestingUserId} tried to delete hotel ${hotelId} created by ${hotel.createdBy}`);
         throw new ForbiddenError('You do not have permission to delete this hotel.');
     }
-    hotel.isActive = false;
+    hotel.isDeleted = true;
 
     try {
         await hotel.save();
     } catch (error: any) {
         if (error instanceof mongoose.Error.ValidationError) {
-            console.error(`hotel.service/softDeleteHotel(): Validation error deactivating hotel ${hotelId}:`, error.errors);
-            throw new BadRequestError(`Invalid data during deactivation: ${error.message}`);
+            console.error(`hotel.service/softDeleteHotel(): Validation error deleting hotel ${hotelId}:`, error.errors);
+            throw new BadRequestError(`Invalid data during deletion: ${error.message}`);
         }
-        console.error(`hotel.service/softDeleteHotel(): Error deactivating hotel ${hotelId}:`, error);
-        throw new AppError('Failed to deactivate hotel due to a database error.', 500);
+        console.error(`hotel.service/softDeleteHotel(): Error deleting hotel ${hotelId}:`, error);
+        throw new AppError('Failed to delete hotel due to a database error.', 500);
     }
+};
+
+/**
+ * SuperAdmin-only: suspends (soft-deletes) any hotel by ID, bypassing the
+ * ownership check. Used by the SuperAdmin suspend-hotel endpoint.
+ * @param hotelId - The ID of the hotel to suspend.
+ * @throws NotFoundError if the hotel is not found or already deleted.
+ * @throws BadRequestError if hotelId is invalid.
+ */
+export const suspendHotelBySuperAdmin = async (
+    hotelId: string | mongoose.Types.ObjectId
+): Promise<void> => {
+    validateObjectId(hotelId, 'hotelId');
+    const hotel = await Hotel.findOne({ _id: hotelId, isDeleted: false });
+    if (!hotel) {
+        throw new NotFoundError('Active hotel not found.');
+    }
+    hotel.isDeleted = true;
+    await hotel.save();
 };

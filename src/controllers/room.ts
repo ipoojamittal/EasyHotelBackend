@@ -15,9 +15,9 @@ const getListOptions = (req: Request): roomService.ListRoomOptions => {
     const limit = parseInt(req.query.limit as string) || 10;
     const roomTypeId = req.query.roomTypeId as string | undefined;
     const status = req.query.status as RoomStatus | undefined;
-    let isActive: boolean | undefined;
-    if (req.query.isActive === 'true') isActive = true;
-    if (req.query.isActive === 'false') isActive = false;
+    let isDeleted: boolean | undefined;
+    if (req.query.isDeleted === 'true') isDeleted = true;
+    if (req.query.isDeleted === 'false') isDeleted = false;
 
     const sortBy = req.query.sortBy as string | undefined;
     const sortOrder = req.query.sortOrder as 'asc' | 'desc' | undefined;
@@ -31,7 +31,7 @@ const getListOptions = (req: Request): roomService.ListRoomOptions => {
         limit: Math.max(1, limit),
         roomTypeId: roomTypeId,
         status: validStatus,
-        isActive,
+        isDeleted,
         sortBy,
         sortOrder: validSortOrder,
     };

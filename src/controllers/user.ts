@@ -10,9 +10,9 @@ const getListOptions = (req: Request): userService.ListUserOptions => {
     const limit = parseInt(req.query.limit as string) || 10;
     const role = req.query.role as Role | undefined;
     const hotelId = req.query.hotelId as string | undefined;
-    let isActive: boolean | undefined;
-    if (req.query.isActive === 'true') isActive = true;
-    if (req.query.isActive === 'false') isActive = false;
+    let isDeleted: boolean | undefined;
+    if (req.query.isDeleted === 'true') isDeleted = true;
+    if (req.query.isDeleted === 'false') isDeleted = false;
     const sortBy = req.query.sortBy as string | undefined;
     const sortOrder = req.query.sortOrder as 'asc' | 'desc' | undefined;
 
@@ -25,7 +25,7 @@ const getListOptions = (req: Request): userService.ListUserOptions => {
         limit: Math.max(1, limit),
         role,
         hotelId,
-        isActive,
+        isDeleted,
         sortBy,
         sortOrder,
     };
@@ -238,10 +238,10 @@ export const handleAdminUpdateUser = async (req: Request, res: Response, next: N
             if (newRole === Role.Customer) throw new ForbiddenError(`Cannot assign role '${Role.Customer}' via admin update.`);
             adminUpdateData.role = newRole;
         }
-        if (req.body.isActive !== undefined) {
-            if (typeof req.body.isActive !== 'boolean') throw new BadRequestError("'isActive' must be a boolean value (true or false).");
-            if (targetUser.id === requestingUser.id && req.body.isActive === false) throw new ForbiddenError("You cannot deactivate your own account.");
-            adminUpdateData.isDeleted = !req.body.isActive;
+        if (req.body.isDeleted !== undefined) {
+            if (typeof req.body.isDeleted !== 'boolean') throw new BadRequestError("'isDeleted' must be a boolean value (true or false).");
+            if (targetUser.id === requestingUser.id && req.body.isDeleted === true) throw new ForbiddenError("You cannot delete your own account.");
+            adminUpdateData.isDeleted = req.body.isDeleted;
         }
 
         Object.assign(targetUser, adminUpdateData);

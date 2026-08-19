@@ -30,12 +30,12 @@ export interface RoomTypeCreationData {
     sortOrder?: number;
 }
 export type RoomTypeUpdateData = Partial<Omit<RoomTypeCreationData, 'typeCode'>> & {
-    isActive?: boolean;
+    isDeleted?: boolean;
 };
 export interface ListRoomTypeOptions {
     page?: number;
     limit?: number;
-    isActive?: boolean;
+    isDeleted?: boolean;
     sortBy?: keyof IRoomType | string;
     sortOrder?: 'asc' | 'desc';
     name?: string;
@@ -48,13 +48,16 @@ const validateObjectId = (id: string | Types.ObjectId, paramName: string): void 
     }
 };
 
+// Whitelisted sort fields to prevent NoSQL injection via sort parameters.
+const ALLOWED_ROOMTYPE_SORT_FIELDS = ['sortOrder', 'name', 'basePrice', 'createdAt', 'updatedAt'];
+
 const checkHotelAccessPermission = async (
     hotelId: string | Types.ObjectId,
     requestingUser: IUser
 ): Promise<IHotel> => {
     validateObjectId(hotelId, 'hotelId');
 
-    const hotel = await Hotel.findOne({ _id: hotelId, isActive: true });
+    const hotel = await Hotel.findOne({ _id: hotelId, isDeleted: false });
 
     if (!hotel) {
         throw new NotFoundError(`Active hotel not found with ID: ${hotelId}`);
@@ -99,7 +102,7 @@ export const createRoomType = async (
     const existingByName = await RoomType.findOne({
         hotel: hotelId,
         name: data.name,
-        isActive: true
+        isDeleted: false
     }).lean();
 
     if (existingByName) {
@@ -110,7 +113,7 @@ export const createRoomType = async (
         const existingByCode = await RoomType.findOne({
             hotel: hotelId,
             typeCode: data.typeCode,
-            isActive: true
+            isDeleted: false
         }).lean();
         if (existingByCode) {
             throw new ConflictError(`An active room type with code '${data.typeCode}' already exists in hotel ${hotel.name}.`);
@@ -120,7 +123,7 @@ export const createRoomType = async (
     const newRoomType = new RoomType({
         ...data,
         hotel: hotelId,
-        isActive: true,
+        isDeleted: false,
     });
 
     try {
@@ -156,7 +159,7 @@ export const getRoomTypeById = async (
     await checkHotelAccessPermission(hotelId, requestingUser);
     validateObjectId(roomTypeId, 'roomTypeId');
 
-    const roomType = await RoomType.findOne({ _id: roomTypeId, hotel: hotelId });
+    const roomType = await RoomType.findOne({ _id: roomTypeId, hotel: hotelId, isDeleted: false });
 
     if (!roomType) {
         throw new NotFoundError(`Room type not found with ID: ${roomTypeId} for hotel ID: ${hotelId}`);
@@ -187,7 +190,7 @@ export const updateRoomType = async (
     const hotel = await checkHotelAccessPermission(hotelId, requestingUser);
     validateObjectId(roomTypeId, 'roomTypeId');
 
-    const roomType = await RoomType.findOne({ _id: roomTypeId, hotel: hotelId });
+    const roomType = await RoomType.findOne({ _id: roomTypeId, hotel: hotelId, isDeleted: false });
     if (!roomType) {
         throw new NotFoundError(`Room type not found with ID: ${roomTypeId} for hotel ${hotel.name}.`);
     }
@@ -196,7 +199,7 @@ export const updateRoomType = async (
         const existingByName = await RoomType.findOne({
             hotel: hotelId,
             name: updateData.name,
-            isActive: true,
+            isDeleted: false,
             _id: { $ne: roomTypeId }
         }).lean();
         if (existingByName) {
@@ -206,16 +209,16 @@ export const updateRoomType = async (
 
     Object.assign(roomType, updateData);
 
-    if (updateData.isActive === false && roomType.isModified('isActive')) {
+    if (updateData.isDeleted === true && roomType.isModified('isDeleted')) {
         const activeRoomsUsingType = await Room.countDocuments({
             roomType: roomTypeId,
             isDeleted: false
         });
 
         if (activeRoomsUsingType > 0) {
-            throw new ConflictError(`Cannot deactivate room type '${roomType.name}' because ${activeRoomsUsingType} active room(s) are currently using it.`);
+            throw new ConflictError(`Cannot delete room type '${roomType.name}' because ${activeRoomsUsingType} active room(s) are currently using it.`);
         }
-        console.warn(`services/roomType.service: Deactivating room type '${roomType.name}' (ID: ${roomTypeId}) for hotel ${hotelId} by user ${requestingUser.id}.`);
+        console.warn(`services/roomType.service: Deleting room type '${roomType.name}' (ID: ${roomTypeId}) for hotel ${hotelId} by user ${requestingUser.id}.`);
     }
 
 
@@ -236,7 +239,7 @@ export const updateRoomType = async (
 /**
  * Lists room types for a specific hotel with filtering, pagination, and sorting after verifying authorization.
  * @param hotelId - The ID of the hotel whose room types to list.
- * @param options - Options object containing parameters for filtering (isActive, name), pagination (page, limit), and sorting (sortBy, sortOrder).
+ * @param options - Options object containing parameters for filtering (isDeleted, name), pagination (page, limit), and sorting (sortBy, sortOrder).
  * @param requestingUser - The user performing the action.
  * @returns Promise<object> - An object containing the list of room types (`roomTypes`) and pagination details (`currentPage`, `totalPages`, `totalRoomTypes`, `limit`).
  * @throws {NotFoundError} If the hotel is not found or inactive.
@@ -251,24 +254,26 @@ export const listRoomTypes = async (
 ) => {
     await checkHotelAccessPermission(hotelId, requestingUser);
 
-    const { page = 1, limit = 10, sortBy = 'sortOrder', sortOrder = 'asc', name } = options;
+    const page = Math.min(1000, Math.max(1, options.page || 1));
+    const limit = Math.min(100, Math.max(1, options.limit || 10));
     const skip = (page - 1) * limit;
 
     const filterQuery: any = { hotel: hotelId };
 
-    if (options.isActive !== undefined) {
-        filterQuery.isActive = options.isActive;
+    if (options.isDeleted !== undefined) {
+        filterQuery.isDeleted = options.isDeleted;
     } else {
-        filterQuery.isActive = true;
+        filterQuery.isDeleted = false;
     }
 
-    if (name) {
-        filterQuery.name = new RegExp(name, 'i');
+    if (options.name) {
+        filterQuery.name = new RegExp(options.name, 'i');
     }
 
     const sortOptions: any = {};
-    sortOptions[sortBy] = sortOrder === 'asc' ? 1 : -1;
-    if (sortBy !== 'name') {
+    const safeSortBy = options.sortBy && ALLOWED_ROOMTYPE_SORT_FIELDS.includes(options.sortBy as string) ? options.sortBy : 'sortOrder';
+    sortOptions[safeSortBy] = options.sortOrder === 'asc' ? 1 : -1;
+    if (safeSortBy !== 'name') {
         sortOptions['name'] = 1;
     }
 
@@ -317,12 +322,12 @@ export const deleteRoomType = async (
     const hotel = await checkHotelAccessPermission(hotelId, requestingUser);
     validateObjectId(roomTypeId, 'roomTypeId');
 
-    const roomType = await RoomType.findOne({ _id: roomTypeId, hotel: hotelId });
+    const roomType = await RoomType.findOne({ _id: roomTypeId, hotel: hotelId, isDeleted: false });
     if (!roomType) {
         throw new NotFoundError(`Room type not found with ID: ${roomTypeId} for hotel ${hotel.name}.`);
     }
-    if (!roomType.isActive) {
-        throw new BadRequestError(`Room type '${roomType.name}' is already inactive.`);
+    if (roomType.isDeleted) {
+        throw new BadRequestError(`Room type '${roomType.name}' is already deleted.`);
     }
 
     const activeRoomsUsingType = await Room.countDocuments({
@@ -331,17 +336,17 @@ export const deleteRoomType = async (
     });
 
     if (activeRoomsUsingType > 0) {
-        throw new ConflictError(`Cannot deactivate room type '${roomType.name}' because ${activeRoomsUsingType} active room(s) are currently using it. Please reassign or delete these rooms first.`);
+        throw new ConflictError(`Cannot delete room type '${roomType.name}' because ${activeRoomsUsingType} active room(s) are currently using it. Please reassign or delete these rooms first.`);
     }
 
-    roomType.isActive = false;
+    roomType.isDeleted = true;
 
     try {
         await roomType.save();
-        console.log(`services/roomType.service: Room Type '${roomType.name}' (ID: ${roomTypeId}) deactivated successfully for hotel ${hotelId} by user ${requestingUser.id}`);
+        console.log(`services/roomType.service: Room Type '${roomType.name}' (ID: ${roomTypeId}) deleted successfully for hotel ${hotelId} by user ${requestingUser.id}`);
     } catch (error: any) {
-        console.error(`services/roomType.service: Error deactivating room type ${roomTypeId}:`, error);
-        throw new AppError('Failed to deactivate room type due to a database error.', 500);
+        console.error(`services/roomType.service: Error deleting room type ${roomTypeId}:`, error);
+        throw new AppError('Failed to delete room type due to a database error.', 500);
     }
 };
 

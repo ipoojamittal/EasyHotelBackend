@@ -51,7 +51,7 @@ const listRoomsValidation = [
     query('limit').optional().isInt({ min: 1 }),
     query('roomTypeId').optional().isMongoId().withMessage('Invalid Room Type ID format in query'),
     query('status').optional().isIn(Object.values(RoomStatus)),
-    query('isActive').optional().isBoolean(),
+    query('isDeleted').optional().isBoolean(),
     query('sortBy').optional().isString().trim(),
     query('sortOrder').optional().isIn(['asc', 'desc']),
 ];

@@ -8,6 +8,10 @@ import { Role } from '../models/User'; // Import Role enum
 
 const router: Router = express.Router();
 
+// Auth middleware applied per-route so that /:hotelId stays public
+// while /my-hotel and POST / require authentication.
+const jwtAuth = passport.authenticate('jwt', { session: false });
+
 // --- Public Routes (no auth required — landing page, browse) ---
 
 /**
@@ -20,26 +24,15 @@ router.get('/',
     query('limit').optional().isInt({ min: 1 }).withMessage('Limit must be a positive integer'),
     query('city').optional().isString().trim(),
     query('country').optional().isString().trim(),
-    query('isActive').optional().isBoolean().withMessage('isActive must be true or false'),
+    query('isDeleted').optional().isBoolean().withMessage('isDeleted must be true or false'),
     query('sortBy').optional().isString().trim().notEmpty(),
     query('sortOrder').optional().isIn(['asc', 'desc']).withMessage('sortOrder must be "asc" or "desc"'),
     hotelController.handleListHotels
 );
 
-/**
- * GET /api/hotels/{hotelId} - Get public details of a specific hotel
- * Public: accessible without authentication.
- */
-router.get('/:hotelId',
-    param('hotelId').isMongoId().withMessage('Invalid Hotel ID format'),
-    hotelController.handleGetHotelDetails
-);
-
 // --- Authenticated routes (JWT required) ---
-
-router.use(passport.authenticate('jwt', { session: false }));
-
-// --- Routes for Hotel Admins Managing Their OWN Hotel ---
+// IMPORTANT: /my-hotel routes MUST be defined before /:hotelId so Express
+// doesn't match "my-hotel" as a :hotelId parameter.
 
 /**
  * POST /api/hotels - Create a new hotel (HotelAdmin only)
@@ -53,6 +46,7 @@ router.use(passport.authenticate('jwt', { session: false }));
  * @security JWT
  */
 router.post('/',
+    jwtAuth,
     checkRole([Role.HotelAdmin]),
     body('name').trim().notEmpty().withMessage('Hotel name is required').isLength({ max: 100 }).withMessage('Hotel name cannot exceed 100 characters'),
     body('address').isObject().withMessage('Address must be an object'),
@@ -84,6 +78,7 @@ router.post('/',
  * @security JWT
  */
 router.get('/my-hotel',
+    jwtAuth,
     checkRole([Role.HotelAdmin]),
     hotelController.handleGetMyHotel
 );
@@ -101,6 +96,7 @@ router.get('/my-hotel',
  * @security JWT
  */
 router.patch('/my-hotel',
+    jwtAuth,
     checkRole([Role.HotelAdmin]),
     body('name').optional().trim().notEmpty().withMessage('Hotel name cannot be empty').isLength({ max: 100 }).withMessage('Hotel name cannot exceed 100 characters'),
     body('address').optional().isObject().withMessage('Address must be an object'),
@@ -128,8 +124,22 @@ router.patch('/my-hotel',
  * @security JWT
  */
 router.delete('/my-hotel',
+    jwtAuth,
     checkRole([Role.HotelAdmin]),
     hotelController.handleDeleteMyHotel
+);
+
+// --- Public route: hotel detail by ID ---
+// MUST be defined after /my-hotel so Express doesn't match "my-hotel"
+// as a :hotelId parameter.
+
+/**
+ * GET /api/hotels/{hotelId} - Get public details of a specific hotel
+ * Public: accessible without authentication.
+ */
+router.get('/:hotelId',
+    param('hotelId').isMongoId().withMessage('Invalid Hotel ID format'),
+    hotelController.handleGetHotelDetails
 );
 
 

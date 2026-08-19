@@ -36,7 +36,7 @@ export interface ListRoomOptions {
     status?: RoomStatus;
     minCapacity?: number;
     maxPrice?: number;
-    isActive?: boolean;
+    isDeleted?: boolean;
     sortBy?: keyof IRoom | string;
     sortOrder?: 'asc' | 'desc';
 }
@@ -47,12 +47,15 @@ const validateObjectId = (id: string | Types.ObjectId, paramName: string): void 
     }
 };
 
+// Whitelisted sort fields to prevent NoSQL injection via sort parameters.
+const ALLOWED_ROOM_SORT_FIELDS = ['roomNumber', 'status', 'createdAt', 'updatedAt', 'capacity', 'pricePerNight'];
+
 const checkHotelAccessPermission = async (
     hotelId: string | Types.ObjectId,
     requestingUser: IUser
 ): Promise<IHotel> => {
     validateObjectId(hotelId, 'hotelId');
-    const hotel = await Hotel.findOne({ _id: hotelId, isActive: true });
+    const hotel = await Hotel.findOne({ _id: hotelId, isDeleted: false });
     if (!hotel) {
         throw new NotFoundError(`Active hotel not found with ID: ${hotelId}`);
     }
@@ -91,7 +94,7 @@ export const createRoom = async (
     const roomType = await RoomType.findOne({
         _id: data.roomTypeId,
         hotel: hotelId,
-        isActive: true
+        isDeleted: false
     });
     if (!roomType) {
         throw new NotFoundError(`Active Room Type with ID ${data.roomTypeId} not found for hotel ${hotel.name}.`);
@@ -150,7 +153,7 @@ export const getRoomDetails = async (
     validateObjectId(hotelId, 'hotelId');
     validateObjectId(roomId, 'roomId');
 
-    const hotelExists = await Hotel.exists({ _id: hotelId, isActive: true });
+    const hotelExists = await Hotel.exists({ _id: hotelId, isDeleted: false });
     if (!hotelExists) {
         throw new NotFoundError(`Active hotel not found with ID: ${hotelId}`);
     }
@@ -169,7 +172,7 @@ export const getRoomDetails = async (
 
     const populatedRoomType = room.roomType;
 
-    if (!populatedRoomType || typeof populatedRoomType !== 'object' || !('name' in populatedRoomType) || !populatedRoomType.isActive) {
+    if (!populatedRoomType || typeof populatedRoomType !== 'object' || !('name' in populatedRoomType) || populatedRoomType.isDeleted) {
         console.warn(`services/room.service: Room ${roomId} is associated with an inactive, missing, or improperly populated RoomType.`);
         throw new NotFoundError(`Room ${roomId} is associated with an inactive or missing Room Type.`);
     }
@@ -208,7 +211,7 @@ export const updateRoom = async (
         const newRoomType = await RoomType.findOne({
             _id: updateData.roomTypeId,
             hotel: hotelId,
-            isActive: true
+            isDeleted: false
         });
         if (!newRoomType) {
             throw new NotFoundError(`Cannot assign Room Type: Active Room Type with ID ${updateData.roomTypeId} not found for this hotel.`);
@@ -239,7 +242,7 @@ export const updateRoom = async (
 /**
  * Lists room instances for a specific hotel with filtering, pagination, and sorting, populated with RoomType details.
  * @param hotelId - The ID of the hotel whose rooms to list.
- * @param options - Options object containing parameters for filtering (isActive, status, roomTypeId), pagination (page, limit), and sorting (sortBy, sortOrder).
+ * @param options - Options object containing parameters for filtering (isDeleted, status, roomTypeId), pagination (page, limit), and sorting (sortBy, sortOrder).
  * @param requestingUser - Optional: The user performing the action. If provided, authorization is checked. If omitted, assumes public access is intended (but still validates hotel).
  * @returns Promise<object> - An object containing the list of rooms (`rooms`) and pagination details (`currentPage`, `totalPages`, `totalRooms`, `limit`).
  * @throws {NotFoundError} If the hotel is not found or inactive.
@@ -256,18 +259,19 @@ export const listRooms = async (
         await checkHotelAccessPermission(hotelId, requestingUser);
     } else {
         validateObjectId(hotelId, 'hotelId');
-        const hotelExists = await Hotel.exists({ _id: hotelId, isActive: true });
+        const hotelExists = await Hotel.exists({ _id: hotelId, isDeleted: false });
         if (!hotelExists) {
             throw new NotFoundError(`Active hotel not found with ID: ${hotelId}`);
         }
     }
 
-    const { page = 1, limit = 10, sortBy = 'roomNumber', sortOrder = 'asc' } = options;
+    const page = Math.min(1000, Math.max(1, options.page || 1));
+    const limit = Math.min(100, Math.max(1, options.limit || 10));
     const skip = (page - 1) * limit;
 
     const filterQuery: mongoose.FilterQuery<IRoom> = { hotel: hotelId };
 
-    filterQuery.isDeleted = options.isActive === false ? true : false;
+    filterQuery.isDeleted = options.isDeleted === true ? true : false;
 
     if (options.status) {
         filterQuery.status = options.status;
@@ -278,7 +282,8 @@ export const listRooms = async (
     }
 
     const sortOptions: any = {};
-    sortOptions[sortBy] = sortOrder === 'asc' ? 1 : -1;
+    const safeSortBy = options.sortBy && ALLOWED_ROOM_SORT_FIELDS.includes(options.sortBy as string) ? options.sortBy : 'roomNumber';
+    sortOptions[safeSortBy] = options.sortOrder === 'asc' ? 1 : -1;
 
     try {
         const [rooms, totalRooms] = await Promise.all([

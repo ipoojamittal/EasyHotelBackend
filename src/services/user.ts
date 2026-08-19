@@ -44,10 +44,13 @@ export interface ListUserOptions {
     limit?: number;
     role?: Role;
     hotelId?: string;
-    isActive?: boolean;
+    isDeleted?: boolean;
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
 }
+
+// Whitelisted sort fields to prevent NoSQL injection via sort parameters.
+const ALLOWED_USER_SORT_FIELDS = ['firstName', 'lastName', 'email', 'role', 'createdAt', 'updatedAt'];
 
 export interface AdminOrStaffCreationData {
     firstName: string;
@@ -241,8 +244,8 @@ export const softDeleteUser = async (userId: string | mongoose.Types.ObjectId): 
  * @returns An object containing the list of *sanitized* users and pagination details.
  */
 export const listUsers = async (options: ListUserOptions) => {
-    const page = Math.max(1, options.page || 1);
-    const limit = Math.max(1, options.limit || 10);
+    const page = Math.min(1000, Math.max(1, options.page || 1));
+    const limit = Math.min(100, Math.max(1, options.limit || 10));
     const skip = (page - 1) * limit;
     const queryFilter: any = {};
 
@@ -257,14 +260,10 @@ export const listUsers = async (options: ListUserOptions) => {
         queryFilter.hotel = new mongoose.Types.ObjectId(options.hotelId);
     }
 
-    if (options.isActive !== undefined) {
-        queryFilter.isDeleted = !options.isActive;
-    } else {
-        queryFilter.isDeleted = false;
-    }
+    queryFilter.isDeleted = options.isDeleted ?? false;
 
     const sort: any = {};
-    if (options.sortBy) {
+    if (options.sortBy && ALLOWED_USER_SORT_FIELDS.includes(options.sortBy)) {
         sort[options.sortBy] = options.sortOrder === 'asc' ? 1 : -1;
     } else {
         sort.createdAt = -1;
@@ -272,6 +271,7 @@ export const listUsers = async (options: ListUserOptions) => {
 
     try {
         const users = await User.find(queryFilter)
+            .populate('hotel', 'name')
             .sort(sort)
             .skip(skip)
             .limit(limit);

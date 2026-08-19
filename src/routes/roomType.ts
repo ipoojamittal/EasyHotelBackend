@@ -51,7 +51,7 @@ const updateRoomTypeValidation = [
     body('tags').optional().isArray().withMessage('Tags must be an array of strings'),
     body('tags.*').optional().isString().trim().notEmpty().isLength({ max: 50 }),
     body('sortOrder').optional().isInt().withMessage('Sort order must be an integer'),
-    body('isActive').optional().isBoolean().withMessage('isActive must be true or false'),
+    body('isDeleted').optional().isBoolean().withMessage('isDeleted must be true or false'),
     // Generally, don't allow changing typeCode via PATCH easily
 ];
 
@@ -59,7 +59,7 @@ const listRoomTypesValidation = [
     query('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer'),
     query('limit').optional().isInt({ min: 1 }).withMessage('Limit must be a positive integer'),
     query('name').optional().isString().trim(),
-    query('isActive').optional().isBoolean().withMessage('isActive must be true or false'),
+    query('isDeleted').optional().isBoolean().withMessage('isDeleted must be true or false'),
     query('sortBy').optional().isString().trim().notEmpty(),
     query('sortOrder').optional().isIn(['asc', 'desc']).withMessage('sortOrder must be "asc" or "desc"'),
 ];
@@ -91,7 +91,7 @@ router.post('/',
  * @param {integer} page.query - Page number
  * @param {integer} limit.query - Items per page
  * @param {string} name.query - Filter by name (case-insensitive contains)
- * @param {boolean} isActive.query - Filter by active status (defaults to true)
+ * @param {boolean} isDeleted.query - Filter by deleted status (defaults to false)
  * @param {string} sortBy.query - Field to sort by
  * @param {string} sortOrder.query - Sort order ('asc' or 'desc')
  * @returns {object} 200 - List of room types and pagination info

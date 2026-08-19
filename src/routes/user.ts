@@ -77,7 +77,7 @@ router.patch('/:userId',
     body('firstName').optional().trim().notEmpty().withMessage('First name cannot be empty').isLength({ max: 50 }).withMessage('First name cannot exceed 50 characters'),
     body('lastName').optional().trim().notEmpty().withMessage('Last name cannot be empty').isLength({ max: 50 }).withMessage('Last name cannot exceed 50 characters'),
     body('role').optional().isIn(Object.values(Role)).withMessage('Invalid user role specified'),
-    body('isActive').optional().isBoolean().withMessage("'isActive' must be true or false"),
+    body('isDeleted').optional().isBoolean().withMessage("'isDeleted' must be true or false"),
     userController.handleAdminUpdateUser
 );
 
