@@ -2,13 +2,24 @@ import express, { Router, Request, Response, NextFunction } from 'express';
 import passport from 'passport';
 import jwt from 'jsonwebtoken';
 import { body, validationResult } from 'express-validator';
+import rateLimit from 'express-rate-limit';
 import * as authService from '../services/auth';
 import { IUser, Role } from '../models/User';
 import { AppError } from '../utils/errors';
 
 const router: Router = express.Router();
 
+// Stricter rate limiting for auth endpoints to prevent brute-force attacks.
+const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    limit: 10, // 10 attempts per 15 minutes per IP
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { message: 'Too many authentication attempts from this IP, please try again after 15 minutes.' },
+});
+
 router.post('/login',
+    authLimiter,
     body('email')
         .trim()
         .notEmpty().withMessage('Email is required')
@@ -93,6 +104,7 @@ router.get('/status',
 );
 
 router.post('/register',
+    authLimiter,
     body('email')
         .trim()
         .isEmail().withMessage('Valid email is required')

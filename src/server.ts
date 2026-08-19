@@ -6,6 +6,7 @@ import helmet from 'helmet';
 import cors from 'cors';
 import passport from 'passport';
 import rateLimit from 'express-rate-limit';
+import mongoose from 'mongoose';
 import connectDB from './config/db'; // Import the DB connection function
 
 // --- Import Routers ---
@@ -35,7 +36,7 @@ app.use(helmet()); // Apply Helmet *early* for security headers on all responses
 
 const allowedOrigins = [
     process.env.CORS_ORIGIN_WEB,
-]
+].filter(Boolean) as string[];
 
 // --- CORS Configuration ---
 app.use(cors({
@@ -67,9 +68,9 @@ const limiter = rateLimit({
 app.use(limiter); //
 
 // --- Standard Middleware ---
-app.use(express.json());
+app.use(express.json({ limit: '1mb' }));
 
-app.use(express.urlencoded({ extended: true }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
 // --- Passport Initialization ---
 app.use(passport.initialize());
@@ -77,6 +78,15 @@ app.use(passport.initialize());
 
 // --- Request Logging Middleware --- <<<< ADDED HERE
 app.use(requestLogger);
+
+// --- Health Check Endpoint ---
+app.get('/health', (_req: Request, res: Response) => {
+    const dbStatus = mongoose.connection.readyState === 1 ? 'connected' : 'disconnected';
+    res.status(dbStatus === 'connected' ? 200 : 503).json({
+        status: dbStatus,
+        timestamp: new Date().toISOString(),
+    });
+});
 
 // --- Routes ---
 app.get('/', (req: Request, res: Response) => {
@@ -95,15 +105,34 @@ app.use('/api/hotels/:hotelId/room-types', roomTypeRouter); // <<< Mount RoomTyp
 
 app.use('/api/hotels/:hotelId/rooms', roomRouter);
 
-app.use('/api/booking', bookingRouter); // Public route for listing rooms (if needed)
+app.use('/api/bookings', bookingRouter);
 
 // --- Error Handling Middleware ---
 
 app.use(globalErrorHandler);
 
 // --- Start Server ---
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
 });
+
+// --- Graceful Shutdown ---
+const gracefulShutdown = async (signal: string) => {
+    console.log(`\n${signal} received: closing HTTP server and DB connection...`);
+    server.close(async () => {
+        console.log('HTTP server closed.');
+        try {
+            await mongoose.connection.close();
+            console.log('MongoDB connection closed.');
+            process.exit(0);
+        } catch (err) {
+            console.error('Error closing MongoDB connection:', err);
+            process.exit(1);
+        }
+    });
+};
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 export default app;
