@@ -167,29 +167,3 @@ export const handleCancelBooking = async (req: Request, res: Response, next: Nex
         next(error);
     }
 };
-
-export const cancelBooking = async (
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ) => {
-    try {
-      const { bookingId } = req.params;
-      const user = req.user as IUserPayload; // Assuming user is attached by auth middleware
-  
-      if (!user) {
-        throw new AppError('Authentication required', 401);
-      }
-  
-      const cancelledBooking = await bookingService.cancelBooking(bookingId, user);
-  
-      res.status(200).json({
-        status: 'success',
-        data: {
-          booking: cancelledBooking,
-        },
-      });
-    } catch (error) {
-      next(error);
-    }
-  };
