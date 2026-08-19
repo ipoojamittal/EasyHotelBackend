@@ -99,7 +99,7 @@ Access checks happen in two layers: `passport.authenticate('jwt', ...)` verifies
 ### Installation
 
 ```bash
-git clone git@github.com:YatharthDixit/hms-backend.git
+git clone git@github.com:ipoojamittal/EasyHotelBackend.git
 cd hms-backend
 npm install
 ```
