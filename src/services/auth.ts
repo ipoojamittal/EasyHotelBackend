@@ -2,8 +2,26 @@
 import User, { IUser, Role } from '../models/User';
 import jwt, { Secret } from 'jsonwebtoken';
 import { ConflictError, AppError } from '../utils/errors'; // Import relevant custom errors
-const jwtSecret: Secret = process.env.JWT_SECRET || 'fallback_insecure_secret';
-const jwtExpiresIn : number = parseInt(process.env.JWT_EXPIRES_IN || '3600', 10);
+
+// Fail fast if JWT_SECRET is missing — never fall back to an insecure default.
+const jwtSecret: Secret = process.env.JWT_SECRET || (() => {
+    throw new Error('FATAL: JWT_SECRET is not defined in environment variables.');
+})();
+
+// Parse duration strings like '1h', '30m', '7d', or a plain number of seconds.
+// Fixes the bug where parseInt('1h') returned 1 (token expired in 1 second).
+function parseExpiry(raw: string): number {
+    const match = raw.match(/^(\d+)([smhd])$/);
+    if (match) {
+        const value = parseInt(match[1], 10);
+        const unit = match[2];
+        const multipliers: Record<string, number> = { s: 1, m: 60, h: 3600, d: 86400 };
+        return value * multipliers[unit];
+    }
+    const parsed = parseInt(raw, 10);
+    return Number.isNaN(parsed) ? 3600 : parsed;
+}
+const jwtExpiresIn: number = parseExpiry(process.env.JWT_EXPIRES_IN || '3600');
 
 export interface RegistrationData {
     firstName: string;

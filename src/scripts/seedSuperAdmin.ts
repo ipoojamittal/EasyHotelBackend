@@ -78,8 +78,7 @@ const seedSuperAdmin = async () => {
 
         // Save the new user to the database
         await superAdmin.save();
-        console.log(`SuperAdmin user '${superAdmin}' created successfully!`);
-        console.log("passwrod", {password})
+        console.log(`SuperAdmin user '${superAdmin.email}' created successfully!`);
 
     } catch (error: any) {
         // Log detailed error information

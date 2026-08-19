@@ -6,6 +6,11 @@ import User, { IUser } from '../models/User';
 
 dotenv.config();
 
+// Fail fast if JWT_SECRET is missing — never fall back to an insecure default.
+const jwtSecret = process.env.JWT_SECRET || (() => {
+    throw new Error('FATAL: JWT_SECRET is not defined in environment variables.');
+})();
+
 passport.use(new LocalStrategy(
     {
         usernameField: 'email',
@@ -13,7 +18,8 @@ passport.use(new LocalStrategy(
     },
     async (email, password, done) => {
         try {
-            const user: IUser | null = await User.findOne({ email: email.toLowerCase() });
+            // Exclude soft-deleted users from logging in.
+            const user: IUser | null = await User.findOne({ email: email.toLowerCase(), isDeleted: false });
             if (!user) {
                 return done(null, false, { message: 'Incorrect username or password.' });
             }
@@ -31,19 +37,14 @@ passport.use(new LocalStrategy(
 
 const jwtOptions = {
     jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
-    secretOrKey: process.env.JWT_SECRET || 'fallback_insecure_secret',
-
-    // Optional settings (commented out).
-    // issuer: 'your-issuer.com', // Verify the 'iss' (issuer) claim in the JWT.
-    // audience: 'your-audience.com', // Verify the 'aud' (audience) claim in the JWT.
-    // Why: Provide additional security checks if you set these claims when signing the token.
-    // If not: These specific claims are not validated.
+    secretOrKey: jwtSecret,
 };
 
 passport.use(new JwtStrategy(jwtOptions,
     async (jwt_payload, done) => {
         try {
-            const user: IUser | null = await User.findById(jwt_payload.id);
+            // Exclude soft-deleted users from authenticating via JWT.
+            const user: IUser | null = await User.findOne({ _id: jwt_payload.id, isDeleted: false });
 
             if (user) {
                 return done(null, user);
