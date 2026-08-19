@@ -172,6 +172,10 @@ UserSchema.methods.comparePassword = async function (candidatePassword: string):
 };
 
 // --- Model Export ---
+// Compound indexes for efficient lookup of active (non-deleted) users by unique fields
+UserSchema.index({ email: 1, isDeleted: 1 });
+UserSchema.index({ phoneNumber: 1, isDeleted: 1 });
+
 const User = mongoose.model<IUser>('User', UserSchema);
 
 export default User;

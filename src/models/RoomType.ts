@@ -27,7 +27,7 @@ export interface IRoomType extends Document {
 
     // --- Management & Display ---
     sortOrder?: number;
-    isActive: boolean;
+    isDeleted: boolean;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -109,9 +109,9 @@ const RoomTypeSchema: Schema<IRoomType> = new Schema<IRoomType>(
             type: Number,
             default: 0,
         },
-        isActive: {
+        isDeleted: {
             type: Boolean,
-            default: true,
+            default: false,
             index: true,
         },
     },
@@ -120,8 +120,8 @@ const RoomTypeSchema: Schema<IRoomType> = new Schema<IRoomType>(
     }
 );
 
-RoomTypeSchema.index({ hotel: 1, name: 1 }, { unique: true, partialFilterExpression: { isActive: true } });
-RoomTypeSchema.index({ hotel: 1, typeCode: 1 }, { unique: true, sparse: true }); // Sparse allows null/missing values
+RoomTypeSchema.index({ hotel: 1, name: 1 }, { unique: true, partialFilterExpression: { isDeleted: false } });
+RoomTypeSchema.index({ hotel: 1, typeCode: 1 }, { unique: true, partialFilterExpression: { isDeleted: false }, sparse: true }); // Sparse allows null/missing values
 
 const RoomType = mongoose.model<IRoomType>('RoomType', RoomTypeSchema);
 export default RoomType;

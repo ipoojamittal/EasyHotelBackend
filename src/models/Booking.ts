@@ -23,6 +23,7 @@ export interface IBooking extends Document {
     status: BookingStatus;
     specialRequests?: string;
     createdBy: Types.ObjectId | IUser;
+    isDeleted: boolean;
     createdAt: Date;
     updatedAt: Date;
     _id: Types.ObjectId;
@@ -83,15 +84,21 @@ const BookingSchema: Schema<IBooking> = new Schema<IBooking>(
             ref: 'User',
             required: true,
         },
+        isDeleted: {
+            type: Boolean,
+            default: false,
+            index: true,
+        },
     },
     {
         timestamps: true,
     }
 );
 
-// Index to ensure a room cannot be double-booked for the same time period.
-// This prevents creating a new booking if there's an existing one for the same room
-// where the date ranges overlap and the status is 'confirmed' or 'checked-in'.
+// NOTE: A unique index on (room, checkInDate, checkOutDate, status) only prevents
+// EXACT date matches, not range overlaps. Overlap prevention is enforced in the
+// service layer via checkRoomAvailability() plus a transaction on create/update.
+// This index still helps catch exact-duplicate submissions quickly.
 BookingSchema.index(
     {
         room: 1,
@@ -102,10 +109,16 @@ BookingSchema.index(
     {
         unique: true,
         partialFilterExpression: {
-            status: { $in: [BookingStatus.Confirmed, BookingStatus.CheckedIn] }
+            status: { $in: [BookingStatus.Confirmed, BookingStatus.CheckedIn] },
+            isDeleted: false,
         }
     }
 );
+
+// Compound indexes for common query patterns
+BookingSchema.index({ user: 1, isDeleted: 1, createdAt: -1 });
+BookingSchema.index({ hotel: 1, isDeleted: 1, status: 1, checkInDate: 1 });
+BookingSchema.index({ room: 1, isDeleted: 1, status: 1 });
 
 
 // Validate that checkOutDate is after checkInDate before saving

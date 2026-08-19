@@ -25,7 +25,7 @@ export interface IHotel extends Document {
         googleMaps?: string;
         appleMaps?: string;
     };
-    isActive: boolean;
+    isDeleted: boolean;
     createdBy: mongoose.Types.ObjectId | IUser;
     createdAt: Date;
     updatedAt: Date;
@@ -59,7 +59,8 @@ const HotelSchema: Schema<IHotel> = new Schema<IHotel>(
             trim: true,
             lowercase: true,
             match: [/.+@.+\..+/, 'Please provide a valid email address'],
-            sparse: true
+            sparse: true,
+            index: { unique: true, sparse: true },
         },
         description: {
             type: String,
@@ -105,9 +106,9 @@ const HotelSchema: Schema<IHotel> = new Schema<IHotel>(
             required: false,
             _id: false
         },
-        isActive: {
+        isDeleted: {
             type: Boolean,
-            default: true,
+            default: false,
             index: true
         },
         createdBy: {
@@ -121,6 +122,10 @@ const HotelSchema: Schema<IHotel> = new Schema<IHotel>(
         timestamps: true,
     }
 );
+
+// Index for finding active (non-deleted) hotels by city/country efficiently
+HotelSchema.index({ isDeleted: 1, 'address.city': 1 });
+HotelSchema.index({ isDeleted: 1, 'address.country': 1 });
 
 const Hotel = mongoose.model<IHotel>('Hotel', HotelSchema);
 export default Hotel;
