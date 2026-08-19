@@ -1,8 +1,8 @@
 // src/routes/admin.ts
 import express, { Router } from 'express';
 import passport from 'passport';
-import { body } from 'express-validator';
-import * as adminController from '../controllers/admin'; // Import the new admin controller
+import { body, param, query } from 'express-validator';
+import * as adminController from '../controllers/admin';
 import { checkRole } from '../middleware/auth';
 import { Role } from '../models/User';
 
@@ -13,33 +13,59 @@ const router: Router = express.Router();
 router.use(passport.authenticate('jwt', { session: false }));
 
 /**
- * POST /api/admin/create-hotel-admin - Create a new HotelAdmin user
- * Requires the requesting user to also be a HotelAdmin (or SuperAdmin later).
- * @route POST /api/admin/create-hotel-admin
- * @group Admin - High-level administrative operations
- * @param {HotelAdminCreationData.model} user.body.required - New HotelAdmin user details
- * @returns {object} 201 - An object containing the newly created HotelAdmin user (sanitized)
- * @returns {Error} 400 - Invalid input data
- * @returns {Error} 401 - Unauthorized (Not logged in)
- * @returns {Error} 403 - Forbidden (User does not have HotelAdmin role)
- * @returns {Error} 409 - Conflict (Email or phone number already exists)
- * @security JWT
+ * POST /api/admin - Create a new HotelAdmin or Staff user
+ * Requires the requesting user to be a HotelAdmin.
  */
 router.post('/',
-    // Authorization: Only allow HotelAdmins (SuperAdmin scope to be added).
     checkRole([Role.HotelAdmin]),
-    // Input Validation
     body('firstName').trim().notEmpty().withMessage('First name is required').isLength({ max: 50 }),
     body('lastName').trim().notEmpty().withMessage('Last name is required').isLength({ max: 50 }),
     body('email').trim().isEmail().withMessage('Valid email is required').normalizeEmail(),
     body('phoneNumber').trim().notEmpty().withMessage('Phone number is required').isMobilePhone('any', { strictMode: false }).withMessage('Invalid phone number format'),
     body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters long'),
-    // Controller Handler
+    body('role').optional().isIn([Role.HotelAdmin, Role.Staff]).withMessage('Role must be hotelAdmin or staff'),
     adminController.handleCreateAdminOrStaff
 );
 
-// Add other admin-specific routes here later
-// e.g., GET /api/admin/hotels (list all hotels system-wide)
-// e.g., PATCH /api/admin/hotels/:hotelId/suspend (suspend a hotel)
+// --- SuperAdmin-only routes ---
+
+/**
+ * GET /api/admin/hotels - List all hotels system-wide (SuperAdmin only)
+ */
+router.get('/hotels',
+    checkRole([Role.SuperAdmin]),
+    query('page').optional().isInt({ min: 1 }),
+    query('limit').optional().isInt({ min: 1 }),
+    query('isDeleted').optional().isBoolean(),
+    query('city').optional().isString().trim(),
+    query('country').optional().isString().trim(),
+    query('sortBy').optional().isString().trim(),
+    query('sortOrder').optional().isIn(['asc', 'desc']),
+    adminController.handleListAllHotels
+);
+
+/**
+ * GET /api/admin/users - List all users system-wide (SuperAdmin only)
+ */
+router.get('/users',
+    checkRole([Role.SuperAdmin]),
+    query('page').optional().isInt({ min: 1 }),
+    query('limit').optional().isInt({ min: 1 }),
+    query('role').optional().isIn(Object.values(Role)),
+    query('hotelId').optional().isMongoId(),
+    query('isDeleted').optional().isBoolean(),
+    query('sortBy').optional().isString().trim(),
+    query('sortOrder').optional().isIn(['asc', 'desc']),
+    adminController.handleListAllUsers
+);
+
+/**
+ * PATCH /api/admin/hotels/:hotelId/suspend - Suspend a hotel (SuperAdmin only)
+ */
+router.patch('/hotels/:hotelId/suspend',
+    checkRole([Role.SuperAdmin]),
+    param('hotelId').isMongoId().withMessage('Invalid Hotel ID format'),
+    adminController.handleSuspendHotel
+);
 
 export default router;
